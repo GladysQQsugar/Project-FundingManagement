@@ -356,9 +356,21 @@
             <el-col :xs="24" :sm="12" v-for="(list, key) in displayDicts" :key="key" class="mb-4">
               <el-card shadow="hover" class="h-full">
                 <template #header>
-                  <div class="font-bold">{{ dictLabels[key] }}</div>
+                  <div class="dictionary-card-header">
+                    <div class="font-bold">{{ dictLabels[key] }}</div>
+                    <el-button v-if="key === 'funds'" type="primary" plain size="small" :icon="Plus" @click="addFundOption">
+                      添加基金
+                    </el-button>
+                  </div>
                 </template>
-                <div class="flex flex-wrap gap-2">
+                <div v-if="key === 'funds'" class="dictionary-fund-list">
+                  <el-tag v-for="item in list" :key="item" type="info" effect="plain" class="editable-fund-tag">
+                    <span>{{ item }}</span>
+                    <el-button :icon="Edit" text circle size="small" @click.stop="renameFundOption(item)" />
+                    <el-button :icon="Delete" text circle size="small" @click.stop="deleteFundOption(item)" />
+                  </el-tag>
+                </div>
+                <div v-else class="flex flex-wrap gap-2">
                   <el-tag v-for="item in list" :key="item" type="info">{{ item }}</el-tag>
                 </div>
               </el-card>
@@ -577,31 +589,39 @@ import * as echarts from 'echarts'
 import { 
   Monitor, Fold, Expand, Download, Collection, DataAnalysis, 
   InfoFilled, Grid, Coin, Comment, Upload, Delete, 
-  RefreshRight, Filter, Search, Plus, Refresh 
+  RefreshRight, Filter, Search, Plus, Refresh, Edit
 } from '@element-plus/icons-vue'
 
 // --- 词典与标准化工具 ---
+const defaultFunds = ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）', '待定']
+const defaultFundAliases = {
+  '人才基金': '人才创新创业基金',
+  '人才创新基金': '人才创新创业基金',
+  '人才创新创业基金': '人才创新创业基金',
+  '武创星': '武创星基金',
+  '武创星基金': '武创星基金',
+  '筹备中': '第三支基金（筹备中）',
+  '未成立': '第三支基金（筹备中）',
+  '未成立/筹备中': '第三支基金（筹备中）',
+  '第三支基金（筹备中）': '第三支基金（筹备中）'
+}
+const fundAliases = reactive({ ...defaultFundAliases })
+
 const normalizeFundName = (val) => {
   if (!val) return "待定";
   const text = String(val).trim();
-  if (["人才基金", "人才创新基金", "人才创新创业基金"].includes(text)) return "人才创新创业基金";
-  if (["武创星", "武创星基金"].includes(text)) return "武创星基金";
-  if (["筹备中", "未成立", "未成立/筹备中", "第三支基金（筹备中）"].includes(text)) return "第三支基金（筹备中）";
+  if (fundAliases[text]) return fundAliases[text];
   return text;
 };
 
 const parseFundNames = (val) => {
   if (!val) return ["待定"];
   let text = String(val).trim();
-  // 统一特殊名称
-  text = text.replace(/人才基金|人才创新基金/g, '人才创新创业基金')
-  text = text.replace(/武创星(?!基金)/g, '武创星基金')
-  text = text.replace(/筹备中|未成立/g, '第三支基金（筹备中）')
   
   // 拆分支持的各种分隔符
   const parts = text.split(/[、，,/;；+/\s]+/).filter(i => i)
   if (parts.length === 0) return ["待定"]
-  return parts.map(p => normalizeFundName(p))
+  return [...new Set(parts.map(p => normalizeFundName(p)))]
 }
 
 const normalizeCollectMonth = (val) => {
@@ -658,7 +678,7 @@ const getMonthNum = (val) => {
 };
 
 const dicts = {
-  funds: ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）', '待定'],
+  funds: [...defaultFunds],
   stages: ['储备项目', '立项阶段', '尽调阶段', '投决阶段', '已投决待交割', '已交割', '暂缓跟进', '终止/放弃'],
   isKeyOptions: ['是', '否', '待判断'],
   sources: ['政府推荐', '园区推荐', '高校院所推荐', 'FA推荐', '机构推荐', '股东/LP推荐', '路演活动', '自主挖掘', '企业主动申报', '历史储备项目', '其他'],
@@ -935,15 +955,22 @@ const completeness = computed(() => {
   return {}
 })
 
+const fundSummaryParts = (items) => {
+  return dicts.funds
+    .map(fund => ({
+      fund,
+      count: items.filter(p => p._fundNames.includes(fund)).length
+    }))
+    .filter(item => item.count > 0 && item.fund !== '待定')
+    .map(item => `${item.fund}储备项目 ${item.count} 条`)
+}
+
 const summaryText = computed(() => {
   if (projects.value.length === 0) return "系统内尚无数据。请导入项目数据以生成摘要。"
   
   const total = projects.value.length
-  
-  // 基金统计
-  const fund1 = projects.value.filter(p => p._fundNames.includes('人才创新创业基金')).length
-  const fund2 = projects.value.filter(p => p._fundNames.includes('武创星基金')).length
-  const fund3 = projects.value.filter(p => p._fundNames.includes('第三支基金（筹备中）')).length
+  const fundSummary = fundSummaryParts(projects.value)
+  const fundSummaryText = fundSummary.length ? `其中，${fundSummary.join('，')}。` : ''
   
   // 使用 Map 一次性计算去重
   const getDeDupCount = (items) => {
@@ -956,7 +983,7 @@ const summaryText = computed(() => {
   };
   const deDupAllCount = getDeDupCount(projects.value);
 
-  let baseText = `截至当前，系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。其中，人才创新创业基金储备项目 ${fund1} 条，武创星基金储备项目 ${fund2} 条，未成立/筹备中基金储备项目 ${fund3} 条。注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
+  let baseText = `截至当前，系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。${fundSummaryText}注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
 
   if (filters.summaryStart || filters.summaryEnd) {
     const fStart = filters.summaryStart;
@@ -1002,7 +1029,7 @@ const summaryText = computed(() => {
     })
     const top3 = Object.entries(dirCounts).sort((a,b) => b[1] - a[1]).slice(0, 3).map(i => i[0])
     const deepWork = projects.value.filter(p => ['尽调阶段', '投决阶段', '已投决待交割', '已交割'].includes(p.stage)).length
-    baseText = `当前系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。其中，人才创新创业基金储备项目 ${fund1} 条，武创星基金储备项目 ${fund2} 条，未成立/筹备中基金储备项目 ${fund3} 条。项目主要集中在 ${top3.length ? top3.join('、') : '多个'} 等产业方向，当前进入尽调及以后阶段的项目共 ${deepWork} 个。注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
+    baseText = `当前系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。${fundSummaryText}项目主要集中在 ${top3.length ? top3.join('、') : '多个'} 等产业方向，当前进入尽调及以后阶段的项目共 ${deepWork} 个。注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
   }
 
   return baseText
@@ -1029,11 +1056,14 @@ const pagedProjects = computed(() => {
 
 const statCards = computed(() => {
   const total = projects.value.length
-  
-  // 基金统计 (使用预计算字段)
-  const fund1 = projects.value.filter(p => p._fundNames.includes('人才创新创业基金')).length
-  const fund2 = projects.value.filter(p => p._fundNames.includes('武创星基金')).length
-  const fund3 = projects.value.filter(p => p._fundNames.includes('第三支基金（筹备中）')).length
+  const fundColors = ['#2563eb', '#7c3aed', '#0891b2', '#0f766e', '#9333ea', '#be123c', '#0369a1']
+  const fundCards = dicts.funds
+    .filter(fund => fund !== '待定')
+    .map((fund, index) => ({
+      label: fund,
+      value: projects.value.filter(p => p._fundNames.includes(fund)).length,
+      color: fundColors[index % fundColors.length]
+    }))
   
   const keyCount = projects.value.filter(p => p.isKey === '是' || p.isKey === true).length
   const inProgressCount = projects.value.filter(p => ['立项阶段', '尽调阶段', '投决阶段', '已投决待交割'].includes(p.stage)).length
@@ -1042,9 +1072,7 @@ const statCards = computed(() => {
 
   return [
     { label: '项目记录数', value: total, color: '#1e3a8a' },
-    { label: '人才创新创业基金', value: fund1, color: '#2563eb' },
-    { label: '武创星基金', value: fund2, color: '#7c3aed' },
-    { label: '第三支基金(筹中)', value: fund3, color: '#0891b2' },
+    ...fundCards,
     { label: '重点推进', value: keyCount, color: '#dc2626' },
     { label: '在推进项目', value: inProgressCount, color: '#ea580c' },
     { label: '已交割', value: deliveredCount, color: '#16a34a' },
@@ -1072,7 +1100,10 @@ const syncFormFund = () => {
   form.fundSelections = funds.length ? funds : ['待定']
   form.fund = form.fundSelections.join('、')
   form.fundSelections.forEach(item => {
-    if (!dicts.funds.includes(item)) dicts.funds.push(item)
+    if (!dicts.funds.includes(item)) {
+      dicts.funds.push(item)
+      saveDictionarySettings()
+    }
   })
 }
 
@@ -1097,10 +1128,158 @@ const handleFundSelectionChange = (index) => {
   syncFormFund()
 }
 
+const saveDictionarySettings = () => {
+  try {
+    localStorage.setItem('fund_dictionary_settings', JSON.stringify({
+      funds: dicts.funds,
+      aliases: toRaw(fundAliases)
+    }))
+  } catch (err) {
+    console.error('Save dictionary failed:', err)
+  }
+}
+
+const loadDictionarySettings = () => {
+  try {
+    const saved = localStorage.getItem('fund_dictionary_settings')
+    if (!saved) return
+    const parsed = JSON.parse(saved)
+    if (Array.isArray(parsed.funds)) {
+      const funds = parsed.funds.map(item => String(item).trim()).filter(Boolean)
+      dicts.funds.splice(0, dicts.funds.length, ...new Set([...funds, '待定']))
+    }
+    if (parsed.aliases && typeof parsed.aliases === 'object') {
+      Object.assign(fundAliases, parsed.aliases)
+    }
+  } catch (err) {
+    console.error('Load dictionary failed:', err)
+  }
+}
+
+const ensureFundOption = (fund) => {
+  const normalized = normalizeFundName(fund)
+  if (!normalized) return ''
+  if (!dicts.funds.includes(normalized)) {
+    dicts.funds.push(normalized)
+    saveDictionarySettings()
+  }
+  return normalized
+}
+
+const addFundOption = () => {
+  ElMessageBox.prompt('请输入新的基金名称', '添加所属基金', {
+    confirmButtonText: '添加',
+    cancelButtonText: '取消',
+    inputPlaceholder: '例如：天使投资基金',
+    inputValidator: (value) => {
+      const name = String(value || '').trim()
+      if (!name) return '基金名称不能为空'
+      if (dicts.funds.includes(name)) return '该基金已存在'
+      return true
+    }
+  }).then(({ value }) => {
+    const name = String(value).trim()
+    dicts.funds.push(name)
+    fundAliases[name] = name
+    saveDictionarySettings()
+    ElMessage.success('基金已添加')
+  }).catch(() => {})
+}
+
+const renameFundOption = (oldName) => {
+  if (oldName === '待定') {
+    ElMessage.warning('“待定”是系统默认兜底项，不建议重命名')
+    return
+  }
+  ElMessageBox.prompt('请输入新的基金名称，保存后会同步更新已有项目记录', '更改基金名称', {
+    confirmButtonText: '保存',
+    cancelButtonText: '取消',
+    inputValue: oldName,
+    inputValidator: (value) => {
+      const name = String(value || '').trim()
+      if (!name) return '基金名称不能为空'
+      if (name !== oldName && dicts.funds.includes(name)) return '该基金已存在'
+      return true
+    }
+  }).then(({ value }) => {
+    const newName = String(value).trim()
+    if (newName === oldName) return
+
+    const index = dicts.funds.indexOf(oldName)
+    if (index >= 0) dicts.funds[index] = newName
+    Object.entries(fundAliases).forEach(([alias, target]) => {
+      if (target === oldName) fundAliases[alias] = newName
+    })
+    fundAliases[oldName] = newName
+    fundAliases[newName] = newName
+
+    projects.value = processProjects(toRaw(projects.value).map(project => ({
+      ...project,
+      fund: parseFundNames(project.fund)
+        .map(item => item === oldName ? newName : item)
+        .join('、')
+    })))
+
+    if (filters.fund === oldName) filters.fund = newName
+    if (form.fundSelections?.some(item => normalizeFundName(item) === newName || item === oldName)) {
+      form.fundSelections = form.fundSelections.map(item => item === oldName ? newName : item)
+      syncFormFund()
+    }
+
+    saveDictionarySettings()
+    saveToLocal()
+    ElMessage.success('基金名称已更新')
+  }).catch(() => {})
+}
+
+const deleteFundOption = (fundName) => {
+  if (fundName === '待定') {
+    ElMessage.warning('“待定”是系统默认兜底项，不能删除')
+    return
+  }
+
+  const usedCount = projects.value.filter(project => project._fundNames?.includes(fundName)).length
+  const message = usedCount
+    ? `当前有 ${usedCount} 个项目使用“${fundName}”。删除后会同步从这些项目的所属基金中移除；如果项目没有其他所属基金，将自动改为“待定”。确定删除吗？`
+    : `确定删除“${fundName}”吗？`
+
+  ElMessageBox.confirm(message, '删除所属基金', {
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    type: usedCount ? 'warning' : 'info',
+    confirmButtonClass: 'el-button--danger'
+  }).then(() => {
+    const index = dicts.funds.indexOf(fundName)
+    if (index >= 0) dicts.funds.splice(index, 1)
+
+    Object.entries(fundAliases).forEach(([alias, target]) => {
+      if (alias === fundName || target === fundName) delete fundAliases[alias]
+    })
+
+    projects.value = processProjects(toRaw(projects.value).map(project => {
+      const remainingFunds = parseFundNames(project.fund).filter(item => item !== fundName)
+      return {
+        ...project,
+        fund: (remainingFunds.length ? remainingFunds : ['待定']).join('、')
+      }
+    }))
+
+    if (filters.fund === fundName) filters.fund = ''
+    if (form.fundSelections?.some(item => normalizeFundName(item) === fundName || item === fundName)) {
+      form.fundSelections = form.fundSelections.filter(item => normalizeFundName(item) !== fundName && item !== fundName)
+      syncFormFund()
+    }
+
+    saveDictionarySettings()
+    saveToLocal()
+    ElMessage.success('基金已删除')
+  }).catch(() => {})
+}
+
 const normalizeProject = (p, duplicateMap) => {
   const normFunds = parseFundNames(p.fund);
   normFunds.forEach(item => {
-    if (!dicts.funds.includes(item)) dicts.funds.push(item)
+    ensureFundOption(item)
   })
   // 兼容多种可能的日期字段名
   const rawDate = p.year || p.collectMonth || p['收集年月'] || p['收集年份'] || p['年份'] || p['日期'] || p['收集日期'];
@@ -1796,6 +1975,7 @@ const clearAllData = () => {
 
 // 生命周期
 onMounted(() => {
+  loadDictionarySettings()
   loadData()
   checkMobile()
   if (activeMenu.value === 'overview') {
@@ -1975,6 +2155,34 @@ html, body, #app {
   margin-bottom: 24px;
   line-height: 1.6;
   max-width: 280px;
+}
+
+.dictionary-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dictionary-fund-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editable-fund-tag {
+  height: auto;
+  min-height: 32px;
+  padding: 4px 4px 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.editable-fund-tag span {
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .fund-selector-stack {
