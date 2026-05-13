@@ -594,6 +594,7 @@ import {
 
 // --- 词典与标准化工具 ---
 const defaultFunds = ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）', '待定']
+const defaultSources = ['政府推荐', '园区推荐', '高校院所推荐', 'FA推荐', '机构推荐', '股东/LP推荐', '路演活动', '自主挖掘', '企业主动申报', '历史储备项目', '其他']
 const defaultFundAliases = {
   '人才基金': '人才创新创业基金',
   '人才创新基金': '人才创新创业基金',
@@ -613,6 +614,11 @@ const normalizeFundName = (val) => {
   if (fundAliases[text]) return fundAliases[text];
   return text;
 };
+
+const normalizeProjectSource = (val) => {
+  const text = String(val || '').trim()
+  return text || '未填写'
+}
 
 const parseFundNames = (val) => {
   if (!val) return ["待定"];
@@ -681,7 +687,7 @@ const dicts = {
   funds: [...defaultFunds],
   stages: ['储备项目', '立项阶段', '尽调阶段', '投决阶段', '已投决待交割', '已交割', '暂缓跟进', '终止/放弃'],
   isKeyOptions: ['是', '否', '待判断'],
-  sources: ['政府推荐', '园区推荐', '高校院所推荐', 'FA推荐', '机构推荐', '股东/LP推荐', '路演活动', '自主挖掘', '企业主动申报', '历史储备项目', '其他'],
+  sources: [...defaultSources],
   priorities: ['高', '中', '低', '待评估'],
   industry965Categories: ['9大支柱产业', '6大战略性新兴产业', '5大未来产业', '待分类', '其他'],
   industry965Map: {
@@ -1166,6 +1172,12 @@ const ensureFundOption = (fund) => {
   return normalized
 }
 
+const ensureSourceOption = (source) => {
+  const normalized = normalizeProjectSource(source)
+  if (!dicts.sources.includes(normalized)) dicts.sources.push(normalized)
+  return normalized
+}
+
 const addFundOption = () => {
   ElMessageBox.prompt('请输入新的基金名称', '添加所属基金', {
     confirmButtonText: '添加',
@@ -1281,6 +1293,7 @@ const normalizeProject = (p, duplicateMap) => {
   normFunds.forEach(item => {
     ensureFundOption(item)
   })
+  const source = ensureSourceOption(p.source)
   // 兼容多种可能的日期字段名
   const rawDate = p.year || p.collectMonth || p['收集年月'] || p['收集年份'] || p['年份'] || p['日期'] || p['收集日期'];
   const normMonth = normalizeCollectMonth(rawDate);
@@ -1293,6 +1306,7 @@ const normalizeProject = (p, duplicateMap) => {
   
   return {
     ...p,
+    source,
     _fundNames: normFunds,
     _normalizedMonth: normMonth,
     _searchKey: searchKey,
@@ -1534,10 +1548,14 @@ const chartDataYear = computed(() => {
 })
 
 const chartDataSource = computed(() => {
-  return dicts.sources.map(s => ({
-    name: s,
-    value: projects.value.filter(p => p.source === s).length
-  })).filter(d => d.value > 0)
+  const sourceCounts = {}
+  projects.value.forEach(project => {
+    const source = normalizeProjectSource(project.source)
+    sourceCounts[source] = (sourceCounts[source] || 0) + 1
+  })
+  return Object.entries(sourceCounts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
 })
 
 // 图表初始化
@@ -1911,7 +1929,7 @@ const handleFileUpload = (event) => {
 
     const keysMap = {
       '项目名称': 'name', '企业名称': 'company', '所属基金': 'fund', '当前阶段': 'stage',
-      '重点推进': 'isKey', '项目来源': 'source', 
+      '重点推进': 'isKey', '项目来源': 'source', '来源': 'source',
       '收集年月': 'year', '收集年份': 'year', '年份': 'year', '日期': 'year', '收集日期': 'year',
       '项目类型': 'type',
       '原始行业': 'originalIndustry', '系统标准行业': 'standardIndustry',
@@ -1923,9 +1941,12 @@ const handleFileUpload = (event) => {
     const headerToKey = headers.map(h => {
       if (!h) return null
       const cleanH = h.replace(/\s/g, '')
+      if (cleanH === '项目来源') return 'source'
       for (const [search, key] of Object.entries(keysMap)) {
+        if (search === '来源') continue
         if (cleanH.includes(search)) return key
       }
+      if (cleanH === '来源') return 'source'
       return null
     })
 
@@ -1934,7 +1955,9 @@ const handleFileUpload = (event) => {
       const values = splitCSVRow(row, delimiter)
       if (!values[nameIdx]) return null
       const item = { id: currentMaxId + idx + 1 }
-      headerToKey.forEach((key, valIdx) => { if (key) item[key] = values[valIdx] || '' })
+      headerToKey.forEach((key, valIdx) => {
+        if (key && (item[key] === undefined || item[key] === '')) item[key] = values[valIdx] || ''
+      })
       return item
     }).filter(i => i)
 
