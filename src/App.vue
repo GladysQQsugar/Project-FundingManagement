@@ -389,9 +389,39 @@
           <el-row :gutter="20">
             <el-col :xs="24" :sm="12">
               <el-form-item label="所属基金">
-                <el-select v-model="form.fund" class="w-full">
-                  <el-option v-for="item in dicts.funds" :key="item" :label="item" :value="item" />
-                </el-select>
+                <div class="fund-selector-stack">
+                  <div v-for="(fund, index) in form.fundSelections" :key="`fund-${index}`" class="fund-selector-row">
+                    <el-select
+                      v-model="form.fundSelections[index]"
+                      filterable
+                      allow-create
+                      default-first-option
+                      placeholder="请选择或输入基金"
+                      class="fund-select"
+                      @change="handleFundSelectionChange(index)"
+                    >
+                      <el-option v-for="item in dicts.funds" :key="item" :label="item" :value="item" />
+                    </el-select>
+                    <el-button
+                      :icon="Delete"
+                      circle
+                      :disabled="form.fundSelections.length === 1"
+                      @click="removeFundSelect(index)"
+                    />
+                  </div>
+                  <div class="selected-fund-tags" v-if="selectedFundTags.length">
+                    <el-tag
+                      v-for="item in selectedFundTags"
+                      :key="item"
+                      closable
+                      type="info"
+                      @close="removeFundTag(item)"
+                    >
+                      {{ item }}
+                    </el-tag>
+                  </div>
+                  <el-button type="primary" plain :icon="Plus" @click="addFundSelect">添加选择栏</el-button>
+                </div>
               </el-form-item>
             </el-col>
             <el-col :xs="24" :sm="12">
@@ -761,6 +791,7 @@ const defaultForm = {
   name: '',
   company: '',
   fund: '待定',
+  fundSelections: ['待定'],
   stage: '储备项目',
   isKey: '否',
   source: '自主挖掘',
@@ -1025,10 +1056,52 @@ const availableDirections = computed(() => {
   return dicts.industry965Map[form.industry965Category] || []
 })
 
+const selectedFundTags = computed(() => normalizeFundSelections(form.fundSelections))
+
 // --- 方法 ---
+
+const normalizeFundSelections = (list) => {
+  const normalized = (Array.isArray(list) ? list : [list])
+    .map(item => normalizeFundName(item))
+    .filter(Boolean)
+  return [...new Set(normalized)]
+}
+
+const syncFormFund = () => {
+  const funds = normalizeFundSelections(form.fundSelections)
+  form.fundSelections = funds.length ? funds : ['待定']
+  form.fund = form.fundSelections.join('、')
+  form.fundSelections.forEach(item => {
+    if (!dicts.funds.includes(item)) dicts.funds.push(item)
+  })
+}
+
+const addFundSelect = () => {
+  form.fundSelections.push('')
+}
+
+const removeFundSelect = (index) => {
+  if (form.fundSelections.length === 1) return
+  form.fundSelections.splice(index, 1)
+  syncFormFund()
+}
+
+const removeFundTag = (fund) => {
+  const target = normalizeFundName(fund)
+  form.fundSelections = form.fundSelections.filter(item => normalizeFundName(item) !== target)
+  syncFormFund()
+}
+
+const handleFundSelectionChange = (index) => {
+  form.fundSelections[index] = normalizeFundName(form.fundSelections[index])
+  syncFormFund()
+}
 
 const normalizeProject = (p, duplicateMap) => {
   const normFunds = parseFundNames(p.fund);
+  normFunds.forEach(item => {
+    if (!dicts.funds.includes(item)) dicts.funds.push(item)
+  })
   // 兼容多种可能的日期字段名
   const rawDate = p.year || p.collectMonth || p['收集年月'] || p['收集年份'] || p['年份'] || p['日期'] || p['收集日期'];
   const normMonth = normalizeCollectMonth(rawDate);
@@ -1150,11 +1223,14 @@ const getPriorityTagType = (p) => {
 
 const openProjectDialog = (row = null) => {
   if (row) {
-    Object.assign(form, row)
+    Object.assign(form, defaultForm, row)
+    form.fundSelections = parseFundNames(row.fund)
   } else {
     Object.assign(form, defaultForm)
     form.id = null
+    form.fundSelections = [...defaultForm.fundSelections]
   }
+  syncFormFund()
   dialogVisible.value = true
 }
 
@@ -1166,6 +1242,7 @@ const handle965CategoryChange = (val) => {
 const saveProject = () => {
   formRef.value.validate((valid) => {
     if (valid) {
+      syncFormFund()
       // 基础校验
       if (!form.name) return ElMessage.error('项目名称不能为空')
       if (!form.fund) return ElMessage.error('所属基金不能为空')
@@ -1194,13 +1271,15 @@ const saveProject = () => {
 
       if (form.id) {
         const index = projects.value.findIndex(p => p.id === form.id)
-        projects.value[index] = { ...form }
+        const { fundSelections, ...projectPayload } = toRaw(form)
+        projects.value[index] = { ...projectPayload }
         // 修改后需要全量刷新标记（因为可能影响重复判定）
         projects.value = processProjects(toRaw(projects.value))
         ElMessage.success('更新成功')
       } else {
         const newId = projects.value.length ? Math.max(...projects.value.map(p => p.id || 0)) + 1 : 1
-        const newItem = { ...form, id: newId }
+        const { fundSelections, ...projectPayload } = toRaw(form)
+        const newItem = { ...projectPayload, id: newId }
         const newRaw = [...toRaw(projects.value), newItem]
         projects.value = processProjects(newRaw)
         ElMessage.success('新增成功')
@@ -1896,6 +1975,30 @@ html, body, #app {
   margin-bottom: 24px;
   line-height: 1.6;
   max-width: 280px;
+}
+
+.fund-selector-stack {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fund-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fund-select {
+  flex: 1;
+}
+
+.selected-fund-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
 }
 
 .el-menu-vertical {
