@@ -307,28 +307,39 @@
         <div v-else-if="activeMenu === 'importExport'" :key="activeMenu" class="fade-in">
           <div class="io-grid">
             <el-card shadow="hover" class="io-card">
-              <template #header><div class="io-card-header">数据导出</div></template>
+              <template #header>
+                <div class="io-card-header-row">
+                  <span class="io-card-icon"><el-icon><Download /></el-icon></span>
+                  <div class="io-card-header">数据导出</div>
+                </div>
+              </template>
               <div class="io-card-body">
                 <p class="io-description">将系统内所有已保存的项目数据下载为 CSV 文件。</p>
-                <div class="flex justify-center">
+                <div class="io-action-area">
                   <el-button type="primary" size="large" @click="exportData(true)" class="px-10">
                     <el-icon class="mr-2"><Download /></el-icon> 导出全部项目 (CSV)
                   </el-button>
                 </div>
+                <div class="io-meta-text">当前项目记录 {{ projects.length }} 条</div>
               </div>
             </el-card>
 
             <el-card shadow="hover" class="io-card">
-              <template #header><div class="io-card-header">数据导入</div></template>
+              <template #header>
+                <div class="io-card-header-row">
+                  <span class="io-card-icon success"><el-icon><Upload /></el-icon></span>
+                  <div class="io-card-header">数据导入</div>
+                </div>
+              </template>
               <div class="io-card-body">
                 <p class="io-description">批量导入项目到系统（支持 CSV 格式）。</p>
-                <div class="flex justify-center">
+                <div class="io-action-area">
                   <el-button type="success" size="large" @click="triggerImport" class="px-10">
                     <el-icon class="mr-2"><Upload /></el-icon> 上传 CSV 文件
                   </el-button>
                 </div>
                 <input type="file" ref="fileInput" class="hidden" accept=".csv" @change="handleFileUpload" />
-                <div class="mt-2">
+                <div class="io-meta-text">
                   <el-link type="primary" class="font-medium" @click="downloadTemplate">下载测试模板.csv</el-link>
                 </div>
               </div>
@@ -1330,6 +1341,35 @@ const processProjects = (data) => {
   return data.map(p => normalizeProject(p, dupMap));
 };
 
+const processProjectsInBatches = async (data, batchSize = 800) => {
+  const dupMap = new Map()
+  const normalized = []
+
+  for (let i = 0; i < data.length; i++) {
+    const p = data[i]
+    const name = (p.name || '').trim()
+    const company = (p.company || '').trim()
+    if (name) {
+      const key = `${name}_${company}`
+      dupMap.set(key, (dupMap.get(key) || 0) + 1)
+    }
+    if (i > 0 && i % batchSize === 0) {
+      loadingText.value = `正在整理重复项目... ${i} / ${data.length}`
+      await waitForUi()
+    }
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    normalized.push(normalizeProject(data[i], dupMap))
+    if (i > 0 && i % batchSize === 0) {
+      loadingText.value = `正在写入项目库... ${i} / ${data.length}`
+      await waitForUi()
+    }
+  }
+
+  return normalized
+}
+
 const loadData = async () => {
   isLoading.value = true;
   loadingText.value = '正在加载项目数据...';
@@ -1558,6 +1598,18 @@ const chartDataSource = computed(() => {
     .sort((a, b) => b.value - a.value)
 })
 
+const chartDataSourceSummary = computed(() => {
+  const topLimit = 8
+  const data = chartDataSource.value
+  if (data.length <= topLimit) return data
+
+  const topItems = data.slice(0, topLimit)
+  const otherValue = data.slice(topLimit).reduce((sum, item) => sum + item.value, 0)
+  return otherValue > 0
+    ? [...topItems, { name: '其他来源', value: otherValue }]
+    : topItems
+})
+
 // 图表初始化
 let charts = []
 const initCharts = () => {
@@ -1659,12 +1711,21 @@ const initCharts = () => {
 
   // 6. 来源分布
   renderChart('chart-source', {
-    tooltip: { trigger: 'item', textStyle: { fontSize: tooltipFontSize } },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)', textStyle: { fontSize: tooltipFontSize } },
+    legend: { bottom: 0, left: 'center', type: 'scroll', textStyle: { fontSize: labelFontSize - 1 }, itemWidth: 12, itemHeight: 12 },
     series: [{ 
       type: 'pie', 
-      radius: '65%', 
-      data: chartDataSource.value, 
-      label: { show: true, formatter: '{b}: {c}', fontSize: labelFontSize, fontWeight: 'bold' } 
+      radius: ['42%', '66%'],
+      center: ['50%', '44%'],
+      avoidLabelOverlap: true,
+      data: chartDataSourceSummary.value, 
+      label: {
+        show: true,
+        formatter: (params) => params.percent >= 8 ? `${params.name}: ${params.value}` : '',
+        fontSize: labelFontSize - 1,
+        fontWeight: 'bold'
+      },
+      labelLine: { show: true, length: 10, length2: 8 }
     }]
   })
 }
@@ -1765,11 +1826,12 @@ const initZoomChart = () => {
   } else if (id === 'chart-source') {
     option = {
       tooltip: { trigger: 'item', ...baseTooltipStyle },
-      legend: { bottom: '5%', left: 'center', textStyle: { fontSize: baseLabelFontSize } },
+      legend: { bottom: '5%', left: 'center', type: 'scroll', textStyle: { fontSize: baseLabelFontSize } },
       series: [{ 
         type: 'pie', 
-        radius: '70%', 
-        data: chartDataSource.value, 
+        radius: ['42%', '72%'],
+        center: ['50%', '45%'],
+        data: chartDataSourceSummary.value, 
         label: { show: true, formatter: '{b}: {c} ({d}%)', fontSize: baseLabelFontSize, fontWeight: 'bold' } 
       }]
     }
@@ -1870,111 +1932,285 @@ const triggerImport = () => {
   fileInput.value.click()
 }
 
-const handleFileUpload = (event) => {
+const waitForUi = () => new Promise(resolve => setTimeout(resolve, 0))
+
+const cleanHeaderCell = (value) => {
+  return String(value || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/^"|"$/g, '')
+    .trim()
+}
+
+const splitCSVRow = (row, sep) => {
+  const result = []
+  let cell = '', inQuotes = false, atFieldStart = true
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i]
+    const nextChar = row[i + 1]
+
+    if (char === '"' && atFieldStart) {
+      inQuotes = true
+      atFieldStart = false
+      continue
+    }
+
+    if (char === '"' && inQuotes) {
+      if (nextChar === '"') {
+        cell += '"'
+        i++
+      } else {
+        inQuotes = false
+      }
+      continue
+    }
+
+    if (char === sep && !inQuotes) {
+      result.push(cell.trim())
+      cell = ''
+      atFieldStart = true
+    } else {
+      cell += char
+      if (char.trim()) atFieldStart = false
+    }
+  }
+  result.push(cell.trim())
+  return result
+}
+
+const detectDelimiter = (row) => {
+  const candidates = [',', '\t', ';', '，']
+  return candidates
+    .map(sep => ({ sep, count: splitCSVRow(row, sep).length }))
+    .sort((a, b) => b.count - a.count)[0]?.sep || ','
+}
+
+const isProjectNameHeader = (header) => {
+  const cleanH = cleanHeaderCell(header).toLowerCase().replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '')
+  if (!cleanH) return false
+  if (cleanH.includes('项目来源') || cleanH.includes('项目类型') || cleanH.includes('项目负责人')) return false
+  return cleanH.includes('项目名称') || cleanH.includes('项目名') || cleanH === '项目' || cleanH.includes('project') || cleanH.includes('name')
+}
+
+const buildImportHeaderMap = (headers) => {
+  const keysMap = {
+    '项目名称': 'name', '企业名称': 'company', '所属基金': 'fund', '当前阶段': 'stage',
+    '重点推进': 'isKey', '项目来源': 'source', '来源': 'source',
+    '收集年月': 'year', '收集年份': 'year', '年份': 'year', '日期': 'year', '收集日期': 'year',
+    '项目类型': 'type',
+    '原始行业': 'originalIndustry', '系统标准行业': 'standardIndustry',
+    '965大类': 'industry965Category', '965产业方向': 'industry965Direction',
+    '细分领域': 'subField', '注册地': 'location', '融资轮次': 'round',
+    '本轮融资金额': 'amount', '项目负责人': 'manager', '进展': 'progress', '备注': 'remark'
+  }
+
+  return headers.map(h => {
+    if (!h) return null
+    const cleanH = cleanHeaderCell(h).replace(/\s/g, '')
+    if (cleanH === '项目来源') return 'source'
+    for (const [search, key] of Object.entries(keysMap)) {
+      if (search === '来源') continue
+      if (cleanH.includes(search)) return key
+    }
+    if (cleanH === '来源') return 'source'
+    return null
+  })
+}
+
+const findImportHeaderLine = (text) => {
+  let pos = 0
+  while (pos < text.length) {
+    let nextPos = text.indexOf('\n', pos)
+    if (nextPos === -1) nextPos = text.length
+    const rawLine = text.slice(pos, nextPos)
+    const cleanLine = rawLine.trim()
+    const cleanHeaderText = cleanLine.replace(/\s/g, '')
+    const startsNext = nextPos < text.length ? nextPos + 1 : text.length
+
+    if (!cleanLine || /^sep\s*=/i.test(cleanLine)) {
+      pos = startsNext
+      continue
+    }
+
+    const delimiter = detectDelimiter(cleanLine)
+    const headers = splitCSVRow(cleanLine, delimiter)
+    if (headers.some(isProjectNameHeader) || cleanHeaderText.includes('项目名称') || /(^|[,;\t，])\s*(name|project)\s*([,;\t，]|$)/i.test(cleanLine)) {
+      return { row: cleanLine, dataStart: startsNext }
+    }
+
+    pos = startsNext
+  }
+  return null
+}
+
+const isImportDataRow = (values, nameIdx) => {
+  const name = String(values[nameIdx] || '').trim()
+  if (!name) return false
+
+  const cleanName = name.replace(/\s/g, '')
+  if (isProjectNameHeader(name)) return false
+  if (/^(合计|总计|统计|小计|备注|说明|注[:：]?|数据来源|序号)$/i.test(cleanName)) return false
+
+  return true
+}
+
+const parseImportRowsInBatches = async ({ text, dataStart, delimiter, headerToKey, nameIdx, currentMaxId }) => {
+  const items = []
+  const totalLines = Math.max(1, (text.match(/\n/g) || []).length)
+  let physicalLines = 0
+  let parsedRecords = 0
+  let importedRows = 0
+  let batchCount = 0
+  let record = ''
+  let inQuotes = false
+  let atFieldStart = true
+
+  const consumeRecord = (rawRecord) => {
+    const rawRow = rawRecord.trim()
+    if (!rawRow) return
+
+    const values = splitCSVRow(rawRow, delimiter)
+    if (isImportDataRow(values, nameIdx)) {
+      const item = { id: currentMaxId + importedRows + 1 }
+      headerToKey.forEach((key, valIdx) => {
+        if (key && (item[key] === undefined || item[key] === '')) item[key] = values[valIdx] || ''
+      })
+      items.push(item)
+      importedRows++
+    }
+    parsedRecords++
+  }
+
+  for (let i = dataStart; i < text.length; i++) {
+    const char = text[i]
+    const nextChar = text[i + 1]
+
+    if (char === '"' && atFieldStart) {
+      inQuotes = true
+      atFieldStart = false
+      record += char
+      continue
+    }
+
+    if (char === '"' && inQuotes) {
+      if (nextChar === '"') {
+        record += char + nextChar
+        i++
+        continue
+      }
+      inQuotes = false
+      record += char
+      continue
+    }
+
+    if (char === '\n') physicalLines++
+
+    if (char === '\n' && !inQuotes) {
+      consumeRecord(record)
+      record = ''
+      atFieldStart = true
+      batchCount++
+    } else {
+      record += char
+      if (char === delimiter && !inQuotes) atFieldStart = true
+      else if (char.trim()) atFieldStart = false
+    }
+
+    if (batchCount >= 500) {
+      loadingText.value = `正在解析数据... 已识别 ${parsedRecords} 条记录，扫描 ${Math.min(physicalLines, totalLines)} / ${totalLines} 行`
+      batchCount = 0
+      await waitForUi()
+    }
+  }
+
+  if (record.trim()) consumeRecord(record)
+
+  return items
+}
+
+const handleFileUpload = async (event) => {
   const file = event.target.files[0]
   if (!file) return
   
   isLoading.value = true;
-  loadingText.value = '正在解析并处理数据...';
+  loadingText.value = '正在读取文件...';
   
   const reader = new FileReader()
   reader.onload = async (e) => {
-    const buffer = e.target.result
-    const decoder = new TextDecoder('utf-8')
-    let text = decoder.decode(buffer)
-    
-    if (!text.includes('项目') && !text.includes('Name') && !text.includes('company')) {
-      try {
-        text = new TextDecoder('gbk').decode(buffer)
-      } catch (err) {}
-    }
-
-    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1) 
-
-    const rows = text.split(/\r?\n/).map(r => r.trim()).filter(r => r)
-    if (rows.length < 2) {
-      isLoading.value = false;
-      return ElMessage.error('CSV文件内容缺失')
-    }
-
-    const firstRow = rows[0]
-    let delimiter = ','
-    if (firstRow.includes('\t')) delimiter = '\t'
-    else if (firstRow.includes(';') && !firstRow.includes(',')) delimiter = ';'
-
-    const splitCSVRow = (row, sep) => {
-      const result = []
-      let cell = '', inQuotes = false
-      for (let i = 0; i < row.length; i++) {
-        const char = row[i]
-        if (char === '"') inQuotes = !inQuotes
-        else if (char === sep && !inQuotes) { result.push(cell.trim()); cell = '' }
-        else cell += char
+    try {
+      const buffer = e.target.result
+      const decoder = new TextDecoder('utf-8')
+      let text = decoder.decode(buffer)
+      
+      if (!text.includes('项目') && !text.includes('Name') && !text.includes('company')) {
+        try {
+          text = new TextDecoder('gbk').decode(buffer)
+        } catch (err) {}
       }
-      result.push(cell.trim())
-      return result.map(v => v.replace(/^"|"$/g, '').replace(/""/g, '"'))
-    }
 
-    const headers = splitCSVRow(rows[0], delimiter)
-    const findIndex = (searchTerms) => headers.findIndex(h => {
-        const cleanH = (h || '').toLowerCase().replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '')
-        return searchTerms.some(term => cleanH.includes(term.toLowerCase()))
-    })
-
-    const nameIdx = findIndex(['项目名称', '项目名', 'Name', 'Project'])
-    if (nameIdx === -1) {
-      isLoading.value = false;
-      return ElMessage.error(`识别失败：未能在首行找到“项目名称”列。`)
-    }
-
-    const keysMap = {
-      '项目名称': 'name', '企业名称': 'company', '所属基金': 'fund', '当前阶段': 'stage',
-      '重点推进': 'isKey', '项目来源': 'source', '来源': 'source',
-      '收集年月': 'year', '收集年份': 'year', '年份': 'year', '日期': 'year', '收集日期': 'year',
-      '项目类型': 'type',
-      '原始行业': 'originalIndustry', '系统标准行业': 'standardIndustry',
-      '965大类': 'industry965Category', '965产业方向': 'industry965Direction',
-      '细分领域': 'subField', '注册地': 'location', '融资轮次': 'round',
-      '本轮融资金额': 'amount', '项目负责人': 'manager', '进展': 'progress', '备注': 'remark'
-    }
-
-    const headerToKey = headers.map(h => {
-      if (!h) return null
-      const cleanH = h.replace(/\s/g, '')
-      if (cleanH === '项目来源') return 'source'
-      for (const [search, key] of Object.entries(keysMap)) {
-        if (search === '来源') continue
-        if (cleanH.includes(search)) return key
-      }
-      if (cleanH === '来源') return 'source'
-      return null
-    })
-
-    const currentMaxId = projects.value.length ? Math.max(...projects.value.map(p => p.id || 0)) : 0
-    const rawNewItems = rows.slice(1).map((row, idx) => {
-      const values = splitCSVRow(row, delimiter)
-      if (!values[nameIdx]) return null
-      const item = { id: currentMaxId + idx + 1 }
-      headerToKey.forEach((key, valIdx) => {
-        if (key && (item[key] === undefined || item[key] === '')) item[key] = values[valIdx] || ''
-      })
-      return item
-    }).filter(i => i)
-
-    if (rawNewItems.length) {
-      // 延迟处理，显示 loading
-      setTimeout(() => {
-        projects.value = processProjects([...toRaw(projects.value), ...rawNewItems])
-        saveToLocal()
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      if (!text.trim()) {
         isLoading.value = false;
-        ElMessage.success(`导入完成：成功导入 ${rawNewItems.length} 条项目。`)
-      }, 100)
-    } else {
+        return ElMessage.error('CSV文件内容缺失')
+      }
+
+      await waitForUi()
+      loadingText.value = '正在识别表头...'
+
+      const headerLine = findImportHeaderLine(text)
+      if (!headerLine) {
+        isLoading.value = false;
+        const preview = text.split('\n').map(line => line.trim()).filter(Boolean).slice(0, 3).join(' / ')
+        return ElMessageBox.alert(`未能找到“项目名称”表头。系统实际读到的前几行是：${preview || '空内容'}`, 'CSV 表头识别失败', {
+          confirmButtonText: '知道了',
+          type: 'warning'
+        })
+      }
+
+      const firstRow = headerLine.row
+      const delimiter = detectDelimiter(firstRow)
+
+      const headers = splitCSVRow(firstRow, delimiter)
+
+      const nameIdx = headers.findIndex(isProjectNameHeader)
+      if (nameIdx === -1) {
+        isLoading.value = false;
+        return ElMessageBox.alert(`已找到疑似表头行，但未能定位“项目名称”列。当前表头为：${headers.map(cleanHeaderCell).join('、')}`, 'CSV 表头识别失败', {
+          confirmButtonText: '知道了',
+          type: 'warning'
+        })
+      }
+
+      const headerToKey = buildImportHeaderMap(headers)
+      const currentMaxId = projects.value.length ? Math.max(...projects.value.map(p => p.id || 0)) : 0
+      const rawNewItems = await parseImportRowsInBatches({ text, dataStart: headerLine.dataStart, delimiter, headerToKey, nameIdx, currentMaxId })
+
+      if (rawNewItems.length) {
+        loadingText.value = '正在写入项目库...'
+        await waitForUi()
+        projects.value = await processProjectsInBatches([...toRaw(projects.value), ...rawNewItems])
+        await waitForUi()
+        loadingText.value = '正在保存数据...'
+        saveToLocal()
+        ElMessage.success(`导入完成：本次导入 ${rawNewItems.length} 条，当前项目总数 ${projects.value.length} 条。`)
+      } else {
+        ElMessage.warning('未能识别到有效项目数据。')
+      }
+    } catch (err) {
+      console.error('Import failed:', err)
+      ElMessage.error('导入失败，请检查 CSV 文件格式')
+    } finally {
       isLoading.value = false;
-      ElMessage.warning('未能识别到有效项目数据。')
+      event.target.value = ''
     }
   }
-  reader.readAsArrayBuffer(file); event.target.value = ''
+  reader.onerror = () => {
+    isLoading.value = false
+    event.target.value = ''
+    ElMessage.error('读取文件失败')
+  }
+  reader.readAsArrayBuffer(file)
 }
 
 // 系统维护功能
@@ -2153,6 +2389,17 @@ html, body, #app {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 300px;
+  border-radius: 8px;
+}
+
+.io-card :deep(.el-card__header) {
+  padding: 18px 22px;
+}
+
+.io-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
 }
 
 .io-card-header {
@@ -2161,23 +2408,63 @@ html, body, #app {
   color: #1f2937;
 }
 
+.io-card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.io-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e3a8a;
+  background: #eff6ff;
+  flex: 0 0 auto;
+}
+
+.io-card-icon.success {
+  color: #047857;
+  background: #ecfdf5;
+}
+
 .io-card-body {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
+  justify-content: space-between;
+  padding: 34px 24px 28px;
   min-height: 220px;
   text-align: center;
+  width: 100%;
 }
 
 .io-description {
   color: #6b7280;
   font-size: 14px;
-  margin-bottom: 24px;
+  margin: 0;
   line-height: 1.6;
   max-width: 280px;
+}
+
+.io-action-area {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.io-meta-text {
+  min-height: 24px;
+  color: #64748b;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dictionary-card-header {
