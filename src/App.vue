@@ -37,6 +37,14 @@
           <el-icon><Fold /></el-icon>
           <span>项目库</span>
         </el-menu-item>
+        <el-menu-item index="invested">
+          <el-icon><Coin /></el-icon>
+          <span>已投项目</span>
+        </el-menu-item>
+        <el-menu-item index="exited">
+          <el-icon><Collection /></el-icon>
+          <span>已退出项目</span>
+        </el-menu-item>
         <el-menu-item index="importExport">
           <el-icon><Download /></el-icon>
           <span>数据导入导出</span>
@@ -303,6 +311,190 @@
         </el-card>
       </div>
 
+        <!-- 已投项目 -->
+        <div v-else-if="activeMenu === 'invested'" :key="activeMenu" class="fade-in">
+          <el-row :gutter="16" class="mb-4">
+            <el-col :xs="12" :sm="6" :lg="3" v-for="item in investedStats" :key="item.label" class="mb-4">
+              <el-card shadow="never" class="invested-stat-card">
+                <div class="text-xs text-gray-500 mb-1">{{ item.label }}</div>
+                <div class="invested-stat-value" :style="{ color: item.color }">{{ item.value }}</div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <el-card class="mb-4 filter-container">
+            <el-form :inline="!isMobile" size="default" class="flex flex-wrap gap-y-4 filter-form-mobile">
+              <el-form-item label="关键词" class="mobile-full">
+                <el-input v-model="investedFilters.keyword" placeholder="项目/企业/负责人/经营进展/备注" clearable class="mobile-full-input" style="width: 260px" />
+              </el-form-item>
+              <el-form-item label="所属基金" class="mobile-full">
+                <el-select v-model="investedFilters.fund" placeholder="全部" clearable class="mobile-full-input" style="width: 170px">
+                  <el-option v-for="item in dicts.funds" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="投资状态" class="mobile-full">
+                <el-select v-model="investedFilters.stage" placeholder="全部" clearable class="mobile-full-input" style="width: 160px">
+                  <el-option label="已投决待交割" value="已投决待交割" />
+                  <el-option label="已交割" value="已交割" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="965大类" class="mobile-full">
+                <el-select v-model="investedFilters.industry965Category" placeholder="全部" clearable class="mobile-full-input" style="width: 160px" @change="handleInvestedCategoryChange">
+                  <el-option v-for="item in dicts.industry965Categories" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="产业方向" class="mobile-full">
+                <el-select v-model="investedFilters.industry965Direction" placeholder="全部" clearable class="mobile-full-input" style="width: 180px">
+                  <el-option v-for="item in availableInvestedDirections" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="注册地" class="mobile-full">
+                <el-select v-model="investedFilters.location" placeholder="全部" filterable clearable allow-create class="mobile-full-input" style="width: 130px">
+                  <el-option v-for="item in investedLocationOptions" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="在汉注册" class="mobile-half">
+                <el-select v-model="investedFilters.registeredInWuhan" placeholder="全部" clearable class="mobile-full-input" style="width: 110px">
+                  <el-option label="是" value="是" />
+                  <el-option label="否" value="否" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="在汉纳税" class="mobile-half">
+                <el-select v-model="investedFilters.taxedInWuhan" placeholder="全部" clearable class="mobile-full-input" style="width: 110px">
+                  <el-option label="是" value="是" />
+                  <el-option label="否" value="否" />
+                </el-select>
+              </el-form-item>
+              <el-form-item class="filter-actions md:ml-auto">
+                <div class="flex flex-wrap gap-2">
+                  <el-button @click="resetInvestedFilters">重置</el-button>
+                  <el-button type="success" @click="exportInvestedData">导出已投资料</el-button>
+                </div>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
+          <el-row :gutter="20" class="mb-4">
+            <el-col :xs="24" :sm="12" :lg="6" v-for="chart in investedCharts" :key="chart.id" class="mb-4">
+              <el-card shadow="hover">
+                <template #header>
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-bold">{{ chart.title }}</span>
+                  </div>
+                </template>
+                <div :id="chart.id" class="invested-chart-container"></div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <el-empty v-if="!investedProjects.length" description="暂无已投项目资料">
+            <el-button type="primary" @click="activeMenu = 'library'">去项目库维护阶段</el-button>
+          </el-empty>
+
+          <div v-else>
+            <el-card shadow="hover" class="invested-list-card">
+              <template #header>
+                <div class="invested-card-header">
+                  <span>已投项目清单</span>
+                  <el-tag type="info" effect="plain">{{ investedProjects.length }} 项</el-tag>
+                </div>
+              </template>
+              <div class="invested-project-grid">
+                <button
+                  v-for="item in investedProjects"
+                  :key="item.id"
+                  class="invested-project-item"
+                  @click="selectInvestedProject(item)"
+                >
+                  <div class="invested-project-main">
+                    <span class="invested-project-name">{{ item.name || '未命名项目' }}</span>
+                    <el-tag :type="getStageTagType(item.stage)" size="small">{{ item.stage }}</el-tag>
+                  </div>
+                  <div class="invested-project-sub">{{ item.company || '企业名称未填写' }}</div>
+                  <div class="invested-project-meta">
+                    <span>{{ item._fundNames?.join('、') || item.fund || '待定' }}</span>
+                    <span>最新估值：{{ displayValue(item.latestValuation) }}</span>
+                  </div>
+                  <div class="invested-project-meta mt-1">
+                    <span>估值变化</span>
+                    <span class="valuation-change" :class="getValuationChangeClass(item)">{{ formatValuationChangeRatio(item) }}</span>
+                  </div>
+                </button>
+              </div>
+            </el-card>
+          </div>
+        </div>
+
+        <!-- 已退出项目 -->
+        <div v-else-if="activeMenu === 'exited'" :key="activeMenu" class="fade-in">
+          <el-row :gutter="16" class="mb-4">
+            <el-col :xs="12" :sm="6" v-for="item in exitedStats" :key="item.label" class="mb-4">
+              <el-card shadow="never" class="invested-stat-card">
+                <div class="text-xs text-gray-500 mb-1">{{ item.label }}</div>
+                <div class="invested-stat-value" :style="{ color: item.color }">{{ item.value }}</div>
+              </el-card>
+            </el-col>
+          </el-row>
+
+          <el-card class="mb-4 filter-container">
+            <el-form :inline="!isMobile" size="default" class="flex flex-wrap gap-y-4 filter-form-mobile">
+              <el-form-item label="关键词" class="mobile-full">
+                <el-input v-model="exitedFilters.keyword" placeholder="项目/企业/退出方式/备注" clearable class="mobile-full-input" style="width: 260px" />
+              </el-form-item>
+              <el-form-item label="所属基金" class="mobile-full">
+                <el-select v-model="exitedFilters.fund" placeholder="全部" clearable class="mobile-full-input" style="width: 170px">
+                  <el-option v-for="item in dicts.funds" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+              <el-form-item class="filter-actions md:ml-auto">
+                <div class="flex flex-wrap gap-2">
+                  <el-button @click="resetExitedFilters">重置</el-button>
+                </div>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
+          <el-empty v-if="!exitedProjects.length" description="暂无已退出项目">
+            <el-button type="primary" @click="activeMenu = 'library'">去项目库维护阶段</el-button>
+          </el-empty>
+
+          <el-card v-else shadow="hover" class="table-card">
+            <el-table :data="exitedProjects" stripe border style="width: 100%">
+              <el-table-column prop="name" label="项目名称" min-width="180" fixed />
+              <el-table-column prop="company" label="企业名称" min-width="160" />
+              <el-table-column label="所属基金" min-width="180">
+                <template #default="scope">{{ scope.row._fundNames?.join('、') || scope.row.fund || '待定' }}</template>
+              </el-table-column>
+              <el-table-column label="退出时间" width="130">
+                <template #default="scope">{{ formatDateCN(scope.row.exitDate) || '-' }}</template>
+              </el-table-column>
+              <el-table-column prop="exitMethod" label="退出方式" width="130" />
+              <el-table-column label="投资金额" width="130">
+                <template #default="scope">{{ displayValue(scope.row.investmentAmount || scope.row.amount) }}</template>
+              </el-table-column>
+              <el-table-column label="退出金额" width="130">
+                <template #default="scope">{{ displayValue(scope.row.exitAmount) }}</template>
+              </el-table-column>
+              <el-table-column label="退出收益" width="130">
+                <template #default="scope">
+                  <span class="valuation-change" :class="getExitIncomeClass(scope.row)">{{ formatExitIncome(scope.row) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="收益率" width="110">
+                <template #default="scope">
+                  <span class="valuation-change" :class="getExitIncomeClass(scope.row)">{{ formatExitReturnRatio(scope.row) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="exitRemark" label="退出备注" min-width="220" show-overflow-tooltip />
+              <el-table-column label="操作" width="100" fixed="right">
+                <template #default="scope">
+                  <el-button link type="primary" @click="openProjectDialog(scope.row)">编辑</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </div>
+
         <!-- 导入导出 -->
         <div v-else-if="activeMenu === 'importExport'" :key="activeMenu" class="fade-in">
           <div class="io-grid">
@@ -390,6 +582,93 @@
         </div>
       </el-main>
     </el-container>
+
+    <!-- 已投项目详情弹窗 -->
+    <el-dialog
+      v-model="investedDetailDialogVisible"
+      :title="selectedInvestedProject?.name || '已投项目详情'"
+      :width="isMobile ? '95%' : '1100px'"
+      top="5vh"
+      destroy-on-close
+    >
+      <div v-if="selectedInvestedProject" class="dialog-body">
+        <div class="invested-detail-header mb-4">
+          <div>
+            <div class="invested-detail-title">{{ selectedInvestedProject.name }}</div>
+            <div class="invested-detail-company">{{ selectedInvestedProject.company || '企业名称未填写' }}</div>
+          </div>
+          <div class="invested-detail-actions">
+            <el-button type="primary" plain @click="openProjectDialog(selectedInvestedProject)">编辑资料</el-button>
+          </div>
+        </div>
+
+        <div class="invested-detail-section-title">基本资料</div>
+        <el-descriptions :column="isMobile ? 1 : 3" border class="mb-4">
+          <el-descriptions-item label="项目名称">{{ displayValue(selectedInvestedProject.name) }}</el-descriptions-item>
+          <el-descriptions-item label="企业名称">{{ displayValue(selectedInvestedProject.company) }}</el-descriptions-item>
+          <el-descriptions-item label="所属基金">{{ selectedInvestedProject._fundNames?.join('、') || selectedInvestedProject.fund || '待定' }}</el-descriptions-item>
+          <el-descriptions-item label="投资状态">
+            <el-tag :type="getStageTagType(selectedInvestedProject.stage)">{{ selectedInvestedProject.stage }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="注册地">{{ displayValue(selectedInvestedProject.location) }}</el-descriptions-item>
+          <el-descriptions-item label="办公地">{{ displayValue(selectedInvestedProject.officeLocation) }}</el-descriptions-item>
+          <el-descriptions-item label="965大类">{{ displayValue(selectedInvestedProject.industry965Category) }}</el-descriptions-item>
+          <el-descriptions-item label="产业方向">{{ displayValue(selectedInvestedProject.industry965Direction) }}</el-descriptions-item>
+          <el-descriptions-item label="细分领域">{{ displayValue(selectedInvestedProject.subField) }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="invested-detail-section-title">投资与估值</div>
+        <el-descriptions :column="isMobile ? 1 : 3" border class="mb-4">
+          <el-descriptions-item label="投资金额">{{ displayValue(selectedInvestedProject.investmentAmount || selectedInvestedProject.amount) }}</el-descriptions-item>
+          <el-descriptions-item label="持股比例">{{ displayValue(selectedInvestedProject.shareholdingRatio) }}</el-descriptions-item>
+          <el-descriptions-item label="投资时间">{{ displayValue(formatCollectMonthCN(selectedInvestedProject.investmentDate) || selectedInvestedProject.investmentDate) }}</el-descriptions-item>
+          <el-descriptions-item label="交割时间">{{ displayValue(formatDateCN(selectedInvestedProject.closingDate)) }}</el-descriptions-item>
+          <el-descriptions-item label="初始投后估值">{{ displayValue(selectedInvestedProject.initialPostValuation) }}</el-descriptions-item>
+          <el-descriptions-item label="最新估值">{{ displayValue(selectedInvestedProject.latestValuation) }}</el-descriptions-item>
+          <el-descriptions-item label="估值变化金额">
+            <span class="valuation-change" :class="getValuationChangeClass(selectedInvestedProject)">{{ formatValuationChangeAmount(selectedInvestedProject) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="估值变化比例">
+            <span class="valuation-change" :class="getValuationChangeClass(selectedInvestedProject)">{{ formatValuationChangeRatio(selectedInvestedProject) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="估值更新时间">{{ displayValue(formatCollectMonthCN(selectedInvestedProject.valuationUpdateDate) || selectedInvestedProject.valuationUpdateDate) }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="invested-detail-section-title">人才与企业数据</div>
+        <el-descriptions :column="isMobile ? 1 : 4" border class="mb-4">
+          <el-descriptions-item label="服务人才数量">{{ displayValue(selectedInvestedProject.servedTalentCount) }}</el-descriptions-item>
+          <el-descriptions-item label="企业员工总数">{{ displayValue(selectedInvestedProject.employeeCount) }}</el-descriptions-item>
+          <el-descriptions-item label="科研人员数量">{{ displayValue(selectedInvestedProject.researcherCount) }}</el-descriptions-item>
+          <el-descriptions-item label="高层次人才数量">{{ displayValue(selectedInvestedProject.highLevelTalentCount) }}</el-descriptions-item>
+          <el-descriptions-item label="博士人数">{{ displayValue(selectedInvestedProject.doctorCount) }}</el-descriptions-item>
+          <el-descriptions-item label="硕士人数">{{ displayValue(selectedInvestedProject.masterCount) }}</el-descriptions-item>
+          <el-descriptions-item label="是否在汉注册">{{ displayValue(selectedInvestedProject.registeredInWuhan) }}</el-descriptions-item>
+          <el-descriptions-item label="是否在汉纳税">{{ displayValue(selectedInvestedProject.taxedInWuhan) }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="invested-detail-section-title">投后跟踪</div>
+        <div class="invested-section">
+          <div class="invested-section-title">最新经营进展</div>
+          <div class="invested-section-content">{{ selectedInvestedProject.latestOperationProgress || selectedInvestedProject.progress || '暂无经营进展记录，请点击“编辑资料”补充。' }}</div>
+        </div>
+        <div class="invested-section">
+          <div class="invested-section-title">投后服务事项</div>
+          <div class="invested-section-content">{{ selectedInvestedProject.postInvestmentServices || '-' }}</div>
+        </div>
+        <div class="invested-section">
+          <div class="invested-section-title">风险情况</div>
+          <div class="invested-section-content">{{ selectedInvestedProject.riskStatus || '-' }}</div>
+        </div>
+        <div class="invested-section">
+          <div class="invested-section-title">下一步计划</div>
+          <div class="invested-section-content">{{ selectedInvestedProject.nextPlan || '-' }}</div>
+        </div>
+        <div class="invested-section">
+          <div class="invested-section-title">最近更新时间 / 备注</div>
+          <div class="invested-section-content">{{ displayValue(selectedInvestedProject.postLastUpdateDate) }}；{{ selectedInvestedProject.remark || '暂无备注。' }}</div>
+        </div>
+      </div>
+    </el-dialog>
 
     <!-- 项目编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑项目' : '新增项目'" :width="isMobile ? '95%' : '1000px'" top="5vh" :close-on-click-modal="false">
@@ -531,6 +810,11 @@
                 <el-input v-model="form.location" />
               </el-form-item>
             </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="办公地">
+                <el-input v-model="form.officeLocation" />
+              </el-form-item>
+            </el-col>
           </el-row>
 
           <el-divider content-position="left"><el-icon><Coin /></el-icon> 融资与推进</el-divider>
@@ -565,6 +849,175 @@
 
           <el-form-item label="当前进展">
             <el-input v-model="form.progress" type="textarea" :rows="3" />
+          </el-form-item>
+
+          <el-divider content-position="left"><el-icon><Coin /></el-icon> 投资与估值</el-divider>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="投资金额">
+                <el-input v-model="form.investmentAmount" placeholder="如：1500万元、2亿元" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="持股比例">
+                <el-input v-model="form.shareholdingRatio" placeholder="如：6%" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="投资时间">
+                <el-date-picker v-model="form.investmentDate" type="month" value-format="YYYY-MM" format="YYYY年M月" placeholder="选择投资时间" class="w-full" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="交割时间">
+                <el-date-picker v-model="form.closingDate" type="date" value-format="YYYY-MM-DD" format="YYYY年M月D日" placeholder="选择交割时间" class="w-full" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="初始投后估值">
+                <el-input v-model="form.initialPostValuation" placeholder="如：2.5亿元" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="最新估值">
+                <el-input v-model="form.latestValuation" placeholder="如：3.2亿元" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="估值变化金额">
+                <el-input :model-value="formatValuationChangeAmount(form)" disabled />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="估值变化比例">
+                <el-input :model-value="formatValuationChangeRatio(form)" disabled />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="估值更新时间">
+                <el-date-picker v-model="form.valuationUpdateDate" type="month" value-format="YYYY-MM" format="YYYY年M月" placeholder="选择更新时间" class="w-full" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-divider content-position="left"><el-icon><DataAnalysis /></el-icon> 人才与企业数据</el-divider>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="服务人才数量">
+                <el-input v-model="form.servedTalentCount" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="员工总数">
+                <el-input v-model="form.employeeCount" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="科研人员数量">
+                <el-input v-model="form.researcherCount" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="高层次人才">
+                <el-input v-model="form.highLevelTalentCount" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="博士人数">
+                <el-input v-model="form.doctorCount" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="8">
+              <el-form-item label="硕士人数">
+                <el-input v-model="form.masterCount" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="是否在汉注册">
+                <el-radio-group v-model="form.registeredInWuhan">
+                  <el-radio label="是" value="是" />
+                  <el-radio label="否" value="否" />
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="是否在汉纳税">
+                <el-radio-group v-model="form.taxedInWuhan">
+                  <el-radio label="是" value="是" />
+                  <el-radio label="否" value="否" />
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-divider content-position="left"><el-icon><Comment /></el-icon> 投后跟踪</el-divider>
+          <el-form-item label="最新经营进展">
+            <el-input v-model="form.latestOperationProgress" type="textarea" :rows="3" />
+          </el-form-item>
+          <el-form-item label="投后服务事项">
+            <el-input v-model="form.postInvestmentServices" type="textarea" :rows="2" />
+          </el-form-item>
+          <el-form-item label="风险情况">
+            <el-input v-model="form.riskStatus" type="textarea" :rows="2" />
+          </el-form-item>
+          <el-form-item label="下一步计划">
+            <el-input v-model="form.nextPlan" type="textarea" :rows="2" />
+          </el-form-item>
+          <el-form-item label="最近更新时间">
+            <el-date-picker v-model="form.postLastUpdateDate" type="date" value-format="YYYY-MM-DD" format="YYYY年M月D日" placeholder="选择最近更新时间" class="w-full" />
+          </el-form-item>
+
+          <el-divider content-position="left"><el-icon><Collection /></el-icon> 退出信息</el-divider>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="退出时间">
+                <el-date-picker v-model="form.exitDate" type="date" value-format="YYYY-MM-DD" format="YYYY年M月D日" placeholder="选择退出时间" class="w-full" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="退出方式">
+                <el-input v-model="form.exitMethod" placeholder="如：股权转让、回购、并购退出" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="退出金额">
+                <el-input v-model="form.exitAmount" placeholder="如：2500万元" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="退出收益">
+                <el-input v-model="form.exitIncome" placeholder="可手填；不填则按退出金额-投资金额计算" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="收益率">
+                <el-input v-model="form.exitReturnRatio" placeholder="可手填，如：25%" />
+              </el-form-item>
+            </el-col>
+            <el-col :xs="24" :sm="12">
+              <el-form-item label="系统测算">
+                <el-input :model-value="`${formatExitIncome(form)} / ${formatExitReturnRatio(form)}`" disabled />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="退出备注">
+            <el-input v-model="form.exitRemark" type="textarea" :rows="2" />
           </el-form-item>
 
           <el-divider content-position="left"><el-icon><Comment /></el-icon> 备注信息</el-divider>
@@ -631,6 +1084,12 @@ const normalizeProjectSource = (val) => {
   return text || '未填写'
 }
 
+const normalizeProjectStage = (val) => {
+  const text = String(val || '').trim()
+  if (text === '终止/放弃') return '已退出'
+  return text || '储备项目'
+}
+
 const parseFundNames = (val) => {
   if (!val) return ["待定"];
   let text = String(val).trim();
@@ -681,6 +1140,20 @@ const formatCollectMonthCN = (val) => {
   return norm;
 }
 
+const formatDateCN = (val) => {
+  if (!val) return ''
+  const text = String(val).trim()
+  const fullDateMatch = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/)
+  if (fullDateMatch) {
+    return `${fullDateMatch[1]}年${parseInt(fullDateMatch[2])}月${parseInt(fullDateMatch[3])}日`
+  }
+  const cnDateMatch = text.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/)
+  if (cnDateMatch) {
+    return `${cnDateMatch[1]}年${parseInt(cnDateMatch[2])}月${parseInt(cnDateMatch[3])}日`
+  }
+  return formatCollectMonthCN(text) || text
+}
+
 const getMonthNum = (val) => {
   if (!val) return 0;
   const str = String(val);
@@ -694,9 +1167,92 @@ const getMonthNum = (val) => {
   return 0;
 };
 
+const investedStageSet = new Set(['已投决待交割', '已交割'])
+
+const investedExtraHeaders = [
+  '投资金额', '持股比例', '投资时间', '交割时间', '初始投后估值', '最新估值', '估值变化金额', '估值变化比例', '估值更新时间',
+  '服务人才数量', '企业员工总数', '科研人员数量', '高层次人才数量', '博士人数', '硕士人数', '办公地',
+  '是否在汉注册', '是否在汉纳税', '最新经营进展', '投后服务事项', '风险情况', '下一步计划', '最近更新时间'
+]
+
+const investedExtraKeys = [
+  'investmentAmount', 'shareholdingRatio', 'investmentDate', 'closingDate', 'initialPostValuation', 'latestValuation', 'valuationChangeAmount', 'valuationChangeRatio', 'valuationUpdateDate',
+  'servedTalentCount', 'employeeCount', 'researcherCount', 'highLevelTalentCount', 'doctorCount', 'masterCount', 'officeLocation',
+  'registeredInWuhan', 'taxedInWuhan', 'latestOperationProgress', 'postInvestmentServices', 'riskStatus', 'nextPlan', 'postLastUpdateDate'
+]
+
+const coreExportHeaders = ['项目名称', '企业名称', '所属基金', '当前阶段', '是否重点推进', '项目来源', '收集年月', '项目类型', '原始行业', '系统标准行业', '965大类', '965产业方向', '细分领域', '注册地', '融资轮次', '本轮融资金额', '项目负责人', '项目优先级', '当前进展', '备注']
+const coreExportKeys = ['name', 'company', 'fund', 'stage', 'isKey', 'source', 'year', 'type', 'originalIndustry', 'standardIndustry', 'industry965Category', 'industry965Direction', 'subField', 'location', 'round', 'amount', 'manager', 'priority', 'progress', 'remark']
+const exportHeaders = [...coreExportHeaders, ...investedExtraHeaders]
+const exportKeys = [...coreExportKeys, ...investedExtraKeys]
+
+const parseAmountToWan = (value) => {
+  if (value === null || value === undefined || value === '') return null
+  const text = String(value).replace(/,/g, '').trim()
+  if (!text) return null
+  const match = text.match(/-?\d+(\.\d+)?/)
+  if (!match) return null
+  let num = Number(match[0])
+  if (Number.isNaN(num)) return null
+  if (text.includes('亿')) num *= 10000
+  return num
+}
+
+const parseCountValue = (value) => {
+  if (value === null || value === undefined || value === '') return 0
+  const match = String(value).replace(/,/g, '').match(/-?\d+(\.\d+)?/)
+  return match ? Number(match[0]) : 0
+}
+
+const formatWanAmount = (value) => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return '-'
+  if (Math.abs(num) >= 10000) {
+    const yi = num / 10000
+    return `${Number.isInteger(yi) ? yi : yi.toFixed(2)}亿元`
+  }
+  return `${Number.isInteger(num) ? num : num.toFixed(2)}万元`
+}
+
+const calcValuationChangeAmount = (project) => {
+  const latest = parseAmountToWan(project.latestValuation)
+  const initial = parseAmountToWan(project.initialPostValuation)
+  if (latest === null || initial === null) return null
+  return latest - initial
+}
+
+const calcValuationChangeRatio = (project) => {
+  const initial = parseAmountToWan(project.initialPostValuation)
+  const diff = calcValuationChangeAmount(project)
+  if (initial === null || initial === 0 || diff === null) return null
+  return diff / initial
+}
+
+const formatValuationChangeAmount = (project) => {
+  const diff = calcValuationChangeAmount(project)
+  return diff === null ? '-' : formatWanAmount(diff)
+}
+
+const formatValuationChangeRatio = (project) => {
+  const ratio = calcValuationChangeRatio(project)
+  if (ratio === null) return '-'
+  return `${ratio > 0 ? '+' : ''}${(ratio * 100).toFixed(1)}%`
+}
+
+const getValuationChangeClass = (project) => {
+  const diff = calcValuationChangeAmount(project)
+  if (diff === null || diff === 0) return 'neutral'
+  return diff > 0 ? 'up' : 'down'
+}
+
+const displayValue = (value) => {
+  if (value === null || value === undefined || value === '') return '-'
+  return value
+}
+
 const dicts = {
   funds: [...defaultFunds],
-  stages: ['储备项目', '立项阶段', '尽调阶段', '投决阶段', '已投决待交割', '已交割', '暂缓跟进', '终止/放弃'],
+  stages: ['储备项目', '立项阶段', '尽调阶段', '投决阶段', '已投决待交割', '已交割', '暂缓跟进', '已退出'],
   isKeyOptions: ['是', '否', '待判断'],
   sources: [...defaultSources],
   priorities: ['高', '中', '低', '待评估'],
@@ -740,13 +1296,39 @@ const dictLabels = {
 // --- 模拟数据生成 ---
 const mockData = [
   { id: 1, name: '硅基光子芯片研发项目', company: '武汉芯光科技有限公司', fund: '人才创新创业基金', stage: '立项阶段', isKey: '是', source: '自主挖掘', year: '2025-01', industry965Category: '9大支柱产业', industry965Direction: '光芯屏端网', manager: '张经理', priority: '高', progress: '已完成初步软硬件验证。' },
-  { id: 2, name: 'AI无人驾驶系统', company: '智慧行科技', fund: '武创星基金', stage: '尽调阶段', isKey: '是', source: '园区推荐', year: '2024-10', industry965Category: '6大战略性新兴产业', industry965Direction: '人工智能', manager: '李主任', priority: '高', progress: '尽调进行到第二次访谈。' },
-  { id: 3, name: '重组蛋白药研发', company: '博奥生物', fund: '人才创新创业基金', stage: '已交割', isKey: '否', source: '高校院所推荐', year: '2023-05', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', manager: '王工', priority: '中', progress: '已于去年完成1500万注资。' },
-  { id: 4, name: '氢能源电池PACK', company: '绿能动力', fund: '第三支基金（筹备中）', stage: '储备项目', isKey: '否', source: 'FA推荐', year: '2025-02', industry965Category: '6大战略性新兴产业', industry965Direction: '氢能', manager: '赵经理', priority: '中', progress: '初步对接，等待BP。' },
+  {
+    id: 2, name: 'AI无人驾驶系统', company: '智慧行科技', fund: '武创星基金', stage: '已投决待交割', isKey: '是', source: '园区推荐', year: '2024-10', industry965Category: '6大战略性新兴产业', industry965Direction: '人工智能', subField: '自动驾驶算法', location: '武汉', officeLocation: '武汉光谷', manager: '李主任', priority: '高', progress: '投决已通过，交割资料准备中。', remark: '需跟踪下一轮融资窗口。',
+    investmentAmount: '2000万元', shareholdingRatio: '8%', investmentDate: '2025-02', closingDate: '', initialPostValuation: '2.5亿元', latestValuation: '3.2亿元', valuationUpdateDate: '2025-05', round: 'A轮',
+    servedTalentCount: 18, employeeCount: 126, researcherCount: 64, highLevelTalentCount: 6, doctorCount: 8, masterCount: 35, registeredInWuhan: '是', taxedInWuhan: '是',
+    latestOperationProgress: '已完成车路协同测试场景扩展，新增两家主机厂试点。', postInvestmentServices: '协助对接智能网联汽车场景和高层次人才政策。', riskStatus: '交割节奏受客户回款影响。', nextPlan: '推动交割材料闭环并跟进量产订单。', postLastUpdateDate: '2025-05-28'
+  },
+  {
+    id: 3, name: '重组蛋白药研发', company: '博奥生物', fund: '人才创新创业基金', stage: '已交割', isKey: '否', source: '高校院所推荐', year: '2023-05', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '创新药研发', location: '武汉', officeLocation: '武汉东湖高新区', manager: '王工', priority: '中', progress: '已于去年完成1500万注资。', remark: '持续关注临床前数据。',
+    investmentAmount: '1500万元', shareholdingRatio: '6%', investmentDate: '2023-09', closingDate: '2023-10', initialPostValuation: '2.5亿元', latestValuation: '2.5亿元', valuationUpdateDate: '2025-04', round: 'Pre-A轮',
+    servedTalentCount: 12, employeeCount: 82, researcherCount: 48, highLevelTalentCount: 5, doctorCount: 12, masterCount: 26, registeredInWuhan: '是', taxedInWuhan: '是',
+    latestOperationProgress: '核心管线完成药效验证，正在推进CMC工艺放大。', postInvestmentServices: '协助申报人才项目和对接临床资源。', riskStatus: '研发周期较长，短期收入贡献有限。', nextPlan: '跟进下一批动物实验数据和专利布局。', postLastUpdateDate: '2025-05-20'
+  },
+  {
+    id: 4, name: '氢能源电池PACK', company: '绿能动力', fund: '第三支基金（筹备中）', stage: '已投决待交割', isKey: '否', source: 'FA推荐', year: '2025-02', industry965Category: '6大战略性新兴产业', industry965Direction: '氢能', subField: '燃料电池系统', location: '襄阳', officeLocation: '武汉经开区', manager: '赵经理', priority: '中', progress: '投决通过，等待工商和协议附件完善。', remark: '估值待交割前复核。',
+    investmentAmount: '1200万元', shareholdingRatio: '5%', investmentDate: '2025-04', closingDate: '', initialPostValuation: '', latestValuation: '', valuationUpdateDate: '', round: 'A轮',
+    servedTalentCount: 6, employeeCount: 95, researcherCount: 31, highLevelTalentCount: 2, doctorCount: 3, masterCount: 18, registeredInWuhan: '否', taxedInWuhan: '否',
+    latestOperationProgress: '样机进入整车厂联合测试，武汉研发中心筹备中。', postInvestmentServices: '协调在汉注册和产业园落地政策咨询。', riskStatus: '异地注册和客户验证进度存在不确定性。', nextPlan: '推动武汉主体设立和交割条件确认。', postLastUpdateDate: '2025-05-18'
+  },
   { id: 5, name: '量子加密路由器', company: '量子盾牌', fund: '武创星基金', stage: '投决阶段', isKey: '是', source: '路演活动', year: '2025-03', industry965Category: '5大未来产业', industry965Direction: '量子科技', manager: '张经理', priority: '高', progress: '已过初评，待上投决会。' },
   { id: 6, name: '深海探测机器人', company: '深海之眼', fund: '人才创新创业基金、武创星基金', stage: '储备项目', isKey: '待判断', source: '自主挖掘', year: '2024-12', industry965Category: '5大未来产业', industry965Direction: '深地深海深空', manager: '钱工', priority: '低', progress: '信息收集阶段。' },
-  { id: 7, name: '工业4.0视觉检测', company: '精测科技', fund: '武创星基金', stage: '已投决待交割', isKey: '是', source: '历史储备项目', year: '2023-11', industry965Category: '9大支柱产业', industry965Direction: '高端装备制造', manager: '孙组长', priority: '高', progress: '手续最后签署中。' },
+  {
+    id: 7, name: '工业4.0视觉检测', company: '精测科技', fund: '武创星基金', stage: '已投决待交割', isKey: '是', source: '历史储备项目', year: '2023-11', industry965Category: '9大支柱产业', industry965Direction: '高端装备制造', subField: '机器视觉检测', location: '武汉', officeLocation: '武汉光谷', manager: '孙组长', priority: '高', progress: '手续最后签署中。', remark: '产业协同空间较大。',
+    investmentAmount: '1800万元', shareholdingRatio: '7.5%', investmentDate: '2025-01', closingDate: '', initialPostValuation: '2.4亿元', latestValuation: '2.1亿元', valuationUpdateDate: '2025-05', round: 'B轮',
+    servedTalentCount: 21, employeeCount: 210, researcherCount: 76, highLevelTalentCount: 4, doctorCount: 5, masterCount: 42, registeredInWuhan: '是', taxedInWuhan: '是',
+    latestOperationProgress: '新签两条产线视觉检测订单，但毛利率短期承压。', postInvestmentServices: '协助对接智能制造客户和研发补贴申报。', riskStatus: '应收账款周期拉长，需关注现金流。', nextPlan: '跟踪交割完成和重点客户回款。', postLastUpdateDate: '2025-05-26'
+  },
   { id: 8, name: '新型碳纤维材料', company: '强力复材', fund: '人才创新创业基金', stage: '暂缓跟进', isKey: '否', source: '园区推荐', year: '2022-09', industry965Category: '待分类', industry965Direction: '待分类', manager: '周经理', priority: '中', progress: '由于估值分歧暂缓。' },
+  {
+    id: 9, name: '爱楷医疗', company: '武汉爱楷医疗科技有限公司', fund: '人才创新创业基金', stage: '已交割', isKey: '是', source: '机构推荐', year: '2024-03', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '医疗器械', location: '武汉', officeLocation: '武汉光谷生物城', manager: '陈经理', priority: '高', progress: '已完成投资交割并进入投后服务期。', remark: '重点支持人才团队建设。',
+    investmentAmount: '1000万元', shareholdingRatio: '4.8%', investmentDate: '2024-06', closingDate: '2024-07', initialPostValuation: '2.08亿元', latestValuation: '2.9亿元', valuationUpdateDate: '2025-05', round: 'A轮',
+    servedTalentCount: 25, employeeCount: 138, researcherCount: 69, highLevelTalentCount: 8, doctorCount: 10, masterCount: 39, registeredInWuhan: '是', taxedInWuhan: '是',
+    latestOperationProgress: '二类医疗器械产品进入注册检测阶段，新增三甲医院合作。', postInvestmentServices: '协助高层次人才认定、临床资源对接和融资材料梳理。', riskStatus: '注册审批周期可能拉长。', nextPlan: '持续跟踪注册检测节点和下一轮融资进展。', postLastUpdateDate: '2025-05-30'
+  }
 ]
 
 // --- 状态变量 ---
@@ -771,6 +1353,8 @@ const handleMenuSelect = (index) => {
   }
   if (index === 'overview') {
     nextTick(() => initCharts())
+  } else if (index === 'invested') {
+    nextTick(() => initInvestedCharts())
   }
 }
 
@@ -812,6 +1396,23 @@ const filters = reactive({
   summaryEnd: ''
 })
 
+const investedFilters = reactive({
+  keyword: '',
+  fund: '',
+  stage: '',
+  industry965Category: '',
+  industry965Direction: '',
+  location: '',
+  registeredInWuhan: '',
+  taxedInWuhan: ''
+})
+const selectedInvestedProjectId = ref(null)
+const investedDetailDialogVisible = ref(false)
+const exitedFilters = reactive({
+  keyword: '',
+  fund: ''
+})
+
 const enlargedChart = ref(null)
 const zoomDialogVisible = ref(false)
 
@@ -840,11 +1441,40 @@ const defaultForm = {
   industry965Direction: '待分类',
   subField: '',
   location: '武汉',
+  officeLocation: '',
   round: '',
   amount: '',
   manager: '',
   priority: '待评估',
   progress: '',
+  investmentAmount: '',
+  shareholdingRatio: '',
+  investmentDate: '',
+  closingDate: '',
+  initialPostValuation: '',
+  latestValuation: '',
+  valuationChangeAmount: '',
+  valuationChangeRatio: '',
+  valuationUpdateDate: '',
+  servedTalentCount: '',
+  employeeCount: '',
+  researcherCount: '',
+  highLevelTalentCount: '',
+  doctorCount: '',
+  masterCount: '',
+  registeredInWuhan: '',
+  taxedInWuhan: '',
+  latestOperationProgress: '',
+  postInvestmentServices: '',
+  riskStatus: '',
+  nextPlan: '',
+  postLastUpdateDate: '',
+  exitDate: '',
+  exitMethod: '',
+  exitAmount: '',
+  exitIncome: '',
+  exitReturnRatio: '',
+  exitRemark: '',
   remark: ''
 }
 let form = reactive({ ...defaultForm })
@@ -860,6 +1490,8 @@ const menuTitle = computed(() => {
   const map = {
     overview: '管理驾驶舱 Dashboard',
     library: '项目库全景分析',
+    invested: '已投项目资料',
+    exited: '已退出项目',
     importExport: '业务数据中心',
     dictionary: '系统运行参数'
   }
@@ -1069,6 +1701,176 @@ const handle965FilterChange = () => {
 const pagedProjects = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   return filteredProjects.value.slice(start, start + pageSize.value)
+})
+
+const investedProjects = computed(() => {
+  const kw = investedFilters.keyword.trim().toLowerCase()
+  return projects.value
+    .filter(project => investedStageSet.has(project.stage))
+    .filter(project => {
+      if (investedFilters.fund && !project._fundNames?.includes(investedFilters.fund)) return false
+      if (investedFilters.stage && project.stage !== investedFilters.stage) return false
+      if (investedFilters.industry965Category && project.industry965Category !== investedFilters.industry965Category) return false
+      if (investedFilters.industry965Direction && project.industry965Direction !== investedFilters.industry965Direction) return false
+      if (investedFilters.location && project.location !== investedFilters.location) return false
+      if (investedFilters.registeredInWuhan && project.registeredInWuhan !== investedFilters.registeredInWuhan) return false
+      if (investedFilters.taxedInWuhan && project.taxedInWuhan !== investedFilters.taxedInWuhan) return false
+      if (!kw) return true
+      return `${project.name || ''} ${project.company || ''} ${project.manager || ''} ${project.latestOperationProgress || ''} ${project.progress || ''} ${project.remark || ''}`.toLowerCase().includes(kw)
+    })
+    .sort((a, b) => {
+      const stageWeight = { '已交割': 2, '已投决待交割': 1 }
+      const weightDiff = (stageWeight[b.stage] || 0) - (stageWeight[a.stage] || 0)
+      if (weightDiff) return weightDiff
+      return (b.id || 0) - (a.id || 0)
+    })
+})
+
+const selectedInvestedProject = computed(() => {
+  if (!investedProjects.value.length) return null
+  return investedProjects.value.find(item => item.id === selectedInvestedProjectId.value) || investedProjects.value[0]
+})
+
+const investedStats = computed(() => {
+  const list = projects.value.filter(project => investedStageSet.has(project.stage))
+  const delivered = list.filter(project => project.stage === '已交割').length
+  const pendingClose = list.filter(project => project.stage === '已投决待交割').length
+  const investmentTotal = list.reduce((sum, project) => sum + (parseAmountToWan(project.investmentAmount || project.amount) || 0), 0)
+  const latestValuationTotal = list.reduce((sum, project) => sum + (parseAmountToWan(project.latestValuation) || 0), 0)
+  const valuationGrowthCount = list.filter(project => (calcValuationChangeAmount(project) || 0) > 0).length
+  const servedTalentTotal = list.reduce((sum, project) => sum + parseCountValue(project.servedTalentCount), 0)
+  const researcherTotal = list.reduce((sum, project) => sum + parseCountValue(project.researcherCount), 0)
+  return [
+    { label: '已投项目', value: list.length, color: '#1e3a8a' },
+    { label: '已交割', value: delivered, color: '#16a34a' },
+    { label: '待交割', value: pendingClose, color: '#ea580c' },
+    { label: '累计投资金额', value: formatWanAmount(investmentTotal), color: '#0f766e' },
+    { label: '最新估值合计', value: formatWanAmount(latestValuationTotal), color: '#2563eb' },
+    { label: '估值增长项目', value: valuationGrowthCount, color: '#16a34a' },
+    { label: '服务人才总数', value: servedTalentTotal, color: '#7c3aed' },
+    { label: '科研人员总数', value: researcherTotal, color: '#0891b2' }
+  ]
+})
+
+const investedCharts = [
+  { id: 'chart-invested-fund', title: '各基金已投项目数量对比' },
+  { id: 'chart-invested-industry', title: '已投项目产业分布' },
+  { id: 'chart-invested-valuation', title: '估值变化Top项目' },
+  { id: 'chart-invested-talent', title: '服务人才数量Top项目' }
+]
+
+const investedLocationOptions = computed(() => {
+  return [...new Set(projects.value
+    .filter(project => investedStageSet.has(project.stage))
+    .map(project => project.location)
+    .filter(Boolean))]
+})
+
+const availableInvestedDirections = computed(() => {
+  if (investedFilters.industry965Category && dicts.industry965Map[investedFilters.industry965Category]) {
+    return dicts.industry965Map[investedFilters.industry965Category]
+  }
+  return Object.values(dicts.industry965Map).flat()
+})
+
+const investedChartDataFund = computed(() => {
+  return dicts.funds
+    .filter(fund => fund !== '待定')
+    .map(fund => ({
+      name: fund,
+      value: investedProjects.value.filter(project => project._fundNames?.includes(fund)).length
+    }))
+    .filter(item => item.value > 0)
+})
+
+const investedChartDataIndustry = computed(() => {
+  const counts = {}
+  investedProjects.value.forEach(project => {
+    const key = project.industry965Direction || '未分类'
+    counts[key] = (counts[key] || 0) + 1
+  })
+  return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+})
+
+const investedChartDataValuationTop = computed(() => {
+  return investedProjects.value
+    .map(project => ({ name: project.name || '未命名项目', value: calcValuationChangeAmount(project) }))
+    .filter(item => item.value !== null)
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+    .slice(0, 8)
+    .reverse()
+})
+
+const investedChartDataTalentTop = computed(() => {
+  return investedProjects.value
+    .map(project => ({ name: project.name || '未命名项目', value: parseCountValue(project.servedTalentCount) }))
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+    .reverse()
+})
+
+const exitedProjects = computed(() => {
+  const kw = exitedFilters.keyword.trim().toLowerCase()
+  return projects.value
+    .filter(project => project.stage === '已退出')
+    .filter(project => {
+      if (exitedFilters.fund && !project._fundNames?.includes(exitedFilters.fund)) return false
+      if (!kw) return true
+      return `${project.name || ''} ${project.company || ''} ${project.exitMethod || ''} ${project.exitRemark || ''} ${project.remark || ''}`.toLowerCase().includes(kw)
+    })
+    .sort((a, b) => (getMonthNum(b.exitDate) || b.id || 0) - (getMonthNum(a.exitDate) || a.id || 0))
+})
+
+const calcExitIncomeWan = (project) => {
+  const explicit = parseAmountToWan(project.exitIncome)
+  if (explicit !== null) return explicit
+  const exitAmount = parseAmountToWan(project.exitAmount)
+  const investAmount = parseAmountToWan(project.investmentAmount || project.amount)
+  if (exitAmount === null || investAmount === null) return null
+  return exitAmount - investAmount
+}
+
+const calcExitReturnRatio = (project) => {
+  const explicitText = String(project.exitReturnRatio || '').trim()
+  if (explicitText) {
+    const num = parseFloat(explicitText.replace('%', ''))
+    if (!Number.isNaN(num)) return explicitText.includes('%') ? num / 100 : num
+  }
+  const investAmount = parseAmountToWan(project.investmentAmount || project.amount)
+  const income = calcExitIncomeWan(project)
+  if (investAmount === null || investAmount === 0 || income === null) return null
+  return income / investAmount
+}
+
+const formatExitIncome = (project) => {
+  const income = calcExitIncomeWan(project)
+  return income === null ? '-' : formatWanAmount(income)
+}
+
+const formatExitReturnRatio = (project) => {
+  const ratio = calcExitReturnRatio(project)
+  if (ratio === null) return '-'
+  return `${ratio > 0 ? '+' : ''}${(ratio * 100).toFixed(1)}%`
+}
+
+const getExitIncomeClass = (project) => {
+  const income = calcExitIncomeWan(project)
+  if (income === null || income === 0) return 'neutral'
+  return income > 0 ? 'up' : 'down'
+}
+
+const exitedStats = computed(() => {
+  const list = exitedProjects.value
+  const totalExitAmount = list.reduce((sum, project) => sum + (parseAmountToWan(project.exitAmount) || 0), 0)
+  const totalIncome = list.reduce((sum, project) => sum + (calcExitIncomeWan(project) || 0), 0)
+  const positiveCount = list.filter(project => (calcExitIncomeWan(project) || 0) > 0).length
+  return [
+    { label: '退出项目数', value: list.length, color: '#1e3a8a' },
+    { label: '退出金额合计', value: formatWanAmount(totalExitAmount), color: '#0f766e' },
+    { label: '退出收益合计', value: formatWanAmount(totalIncome), color: totalIncome >= 0 ? '#16a34a' : '#dc2626' },
+    { label: '正收益项目', value: positiveCount, color: '#16a34a' }
+  ]
 })
 
 const statCards = computed(() => {
@@ -1317,6 +2119,7 @@ const normalizeProject = (p, duplicateMap) => {
   
   return {
     ...p,
+    stage: normalizeProjectStage(p.stage),
     source,
     _fundNames: normFunds,
     _normalizedMonth: normMonth,
@@ -1435,6 +2238,31 @@ const resetFilters = () => {
   })
 }
 
+const resetInvestedFilters = () => {
+  investedFilters.keyword = ''
+  investedFilters.fund = ''
+  investedFilters.stage = ''
+  investedFilters.industry965Category = ''
+  investedFilters.industry965Direction = ''
+  investedFilters.location = ''
+  investedFilters.registeredInWuhan = ''
+  investedFilters.taxedInWuhan = ''
+}
+
+const handleInvestedCategoryChange = () => {
+  investedFilters.industry965Direction = ''
+}
+
+const resetExitedFilters = () => {
+  exitedFilters.keyword = ''
+  exitedFilters.fund = ''
+}
+
+const selectInvestedProject = (project) => {
+  selectedInvestedProjectId.value = project.id
+  investedDetailDialogVisible.value = true
+}
+
 const getStageTagType = (stage) => {
   const map = {
     '储备项目': 'info',
@@ -1444,6 +2272,7 @@ const getStageTagType = (stage) => {
     '已投决待交割': 'success',
     '已交割': 'success',
     '暂缓跟进': 'info',
+    '已退出': 'danger',
     '终止/放弃': 'danger'
   }
   return map[stage] || 'info'
@@ -1730,6 +2559,84 @@ const initCharts = () => {
   })
 }
 
+const initInvestedCharts = () => {
+  charts.forEach(c => c.dispose())
+  charts = []
+
+  const colors = ['#1e3a8a', '#2563eb', '#0f766e', '#7c3aed', '#ea580c', '#dc2626']
+  const labelStyle = { fontSize: 12, fontWeight: 'bold' }
+
+  renderChart('chart-invested-fund', {
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '4%', bottom: '16%', containLabel: true },
+    xAxis: { type: 'category', data: investedChartDataFund.value.map(item => item.name), axisLabel: { interval: 0, rotate: 20, fontSize: 11 } },
+    yAxis: { type: 'value' },
+    series: [{
+      type: 'bar',
+      data: investedChartDataFund.value.map(item => item.value),
+      itemStyle: { color: colors[0], borderRadius: [4, 4, 0, 0] },
+      label: { show: true, position: 'top', ...labelStyle }
+    }]
+  })
+
+  renderChart('chart-invested-industry', {
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    legend: { bottom: 0, left: 'center', type: 'scroll', itemWidth: 12, itemHeight: 12, textStyle: { fontSize: 11 } },
+    series: [{
+      type: 'pie',
+      radius: ['42%', '66%'],
+      center: ['50%', '43%'],
+      avoidLabelOverlap: true,
+      itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+      label: { formatter: (params) => params.percent >= 8 ? `${params.name}: ${params.value}` : '', fontSize: 11 },
+      data: investedChartDataIndustry.value
+    }]
+  })
+
+  renderChart('chart-invested-valuation', {
+    tooltip: { trigger: 'axis', formatter: (params) => `${params[0].name}: ${formatWanAmount(params[0].value)}` },
+    grid: { left: '3%', right: '16%', bottom: '10%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      splitNumber: 3,
+      axisLabel: {
+        hideOverlap: true,
+        margin: 10,
+        fontSize: 10,
+        formatter: (value) => {
+          if (Math.abs(value) >= 10000) return `${Number((value / 10000).toFixed(1))}亿`
+          return `${Number(value.toFixed(0))}万`
+        }
+      }
+    },
+    yAxis: { type: 'category', data: investedChartDataValuationTop.value.map(item => item.name), axisLabel: { fontSize: 11, formatter: (value) => value.length > 8 ? `${value.slice(0, 8)}...` : value } },
+    series: [{
+      type: 'bar',
+      data: investedChartDataValuationTop.value.map(item => item.value),
+      itemStyle: { color: (params) => params.value >= 0 ? '#16a34a' : '#dc2626', borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right', formatter: (params) => formatWanAmount(params.value), fontSize: 11 }
+    }]
+  })
+
+  renderChart('chart-invested-talent', {
+    tooltip: { trigger: 'axis' },
+    grid: { left: '3%', right: '14%', bottom: '10%', containLabel: true },
+    xAxis: {
+      type: 'value',
+      splitNumber: 3,
+      minInterval: 1,
+      axisLabel: { hideOverlap: true, margin: 10, fontSize: 10 }
+    },
+    yAxis: { type: 'category', data: investedChartDataTalentTop.value.map(item => item.name), axisLabel: { fontSize: 11, formatter: (value) => value.length > 8 ? `${value.slice(0, 8)}...` : value } },
+    series: [{
+      type: 'bar',
+      data: investedChartDataTalentTop.value.map(item => item.value),
+      itemStyle: { color: colors[3], borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: 'right', ...labelStyle }
+    }]
+  })
+}
+
 const initZoomChart = () => {
   if (!enlargedChart.value) return
   const id = enlargedChart.value.id
@@ -1871,12 +2778,9 @@ const exportData = (all = false) => {
   const list = all ? projects.value : filteredProjects.value
   if (!list.length) return ElMessage.warning('没有可导出的数据')
 
-  const headers = ['项目名称', '企业名称', '所属基金', '当前阶段', '是否重点推进', '项目来源', '收集年月', '项目类型', '原始行业', '系统标准行业', '965大类', '965产业方向', '细分领域', '注册地', '融资轮次', '本轮融资金额', '项目负责人', '项目优先级', '当前进展', '备注']
-  const keys = ['name', 'company', 'fund', 'stage', 'isKey', 'source', 'year', 'type', 'originalIndustry', 'standardIndustry', 'industry965Category', 'industry965Direction', 'subField', 'location', 'round', 'amount', 'manager', 'priority', 'progress', 'remark']
-
-  let csvContent = '\uFEFF' + headers.join(',') + '\n'
+  let csvContent = '\uFEFF' + coreExportHeaders.join(',') + '\n'
   list.forEach(item => {
-    const row = keys.map(k => {
+    const row = coreExportKeys.map(k => {
       let val = item[k] || ''
       if (k === 'year') val = formatCollectMonthCN(val)
       if (k === 'fund') {
@@ -1915,9 +2819,41 @@ const exportData = (all = false) => {
   document.body.removeChild(link)
 }
 
+const exportInvestedData = () => {
+  const list = investedProjects.value
+  if (!list.length) return ElMessage.warning('没有可导出的已投项目资料')
+
+  let csvContent = '\uFEFF' + exportHeaders.join(',') + '\n'
+  list.forEach(item => {
+    const row = exportKeys.map(k => {
+      let val = item[k] || ''
+      if (['year', 'investmentDate', 'valuationUpdateDate'].includes(k)) val = formatCollectMonthCN(val) || val
+      if (k === 'closingDate') val = formatDateCN(val) || val
+      if (k === 'valuationChangeAmount') val = formatValuationChangeAmount(item)
+      if (k === 'valuationChangeRatio') val = formatValuationChangeRatio(item)
+      if (k === 'fund') val = parseFundNames(val).join('、')
+      if (typeof val === 'string' && (val.includes(',') || val.includes('\n'))) {
+        val = `"${val.replace(/"/g, '""')}"`
+      }
+      return val
+    })
+    csvContent += row.join(',') + '\n'
+  })
+
+  const filename = `已投项目资料_${new Date().toISOString().split('T')[0]}.csv`
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', filename)
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 const downloadTemplate = () => {
-  const headers = ['项目名称', '企业名称', '所属基金', '当前阶段', '是否重点推进', '项目来源', '收集年月', '项目类型', '原始行业', '系统标准行业', '965大类', '965产业方向', '细分领域', '注册地', '融资轮次', '本轮融资金额', '项目负责人', '项目优先级', '当前进展', '备注']
-  let csvContent = '\uFEFF' + headers.join(',') + '\n'
+  let csvContent = '\uFEFF' + coreExportHeaders.join(',') + '\n'
   csvContent += '示例项目,示例企业,人才创新创业基金,储备项目,否,自主挖掘,2025年1月,成长投,无,人工智能,6大战略性新兴产业,人工智能,视觉,武汉,A轮,5000万,张三,中,进展良好,无'
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2001,7 +2937,15 @@ const buildImportHeaderMap = (headers) => {
     '原始行业': 'originalIndustry', '系统标准行业': 'standardIndustry',
     '965大类': 'industry965Category', '965产业方向': 'industry965Direction',
     '细分领域': 'subField', '注册地': 'location', '融资轮次': 'round',
-    '本轮融资金额': 'amount', '项目负责人': 'manager', '进展': 'progress', '备注': 'remark'
+    '本轮融资金额': 'amount', '项目负责人': 'manager', '进展': 'progress', '备注': 'remark',
+    '投资金额': 'investmentAmount', '持股比例': 'shareholdingRatio', '投资时间': 'investmentDate',
+    '交割时间': 'closingDate', '初始投后估值': 'initialPostValuation', '最新估值': 'latestValuation',
+    '估值变化金额': 'valuationChangeAmount', '估值变化比例': 'valuationChangeRatio', '估值更新时间': 'valuationUpdateDate',
+    '服务人才数量': 'servedTalentCount', '企业员工总数': 'employeeCount', '科研人员数量': 'researcherCount',
+    '高层次人才数量': 'highLevelTalentCount', '博士人数': 'doctorCount', '硕士人数': 'masterCount',
+    '办公地': 'officeLocation', '是否在汉注册': 'registeredInWuhan', '是否在汉纳税': 'taxedInWuhan',
+    '最新经营进展': 'latestOperationProgress', '投后服务事项': 'postInvestmentServices',
+    '风险情况': 'riskStatus', '下一步计划': 'nextPlan', '最近更新时间': 'postLastUpdateDate'
   }
 
   return headers.map(h => {
@@ -2239,6 +3183,8 @@ onMounted(() => {
   checkMobile()
   if (activeMenu.value === 'overview') {
     nextTick(() => initCharts())
+  } else if (activeMenu.value === 'invested') {
+    nextTick(() => initInvestedCharts())
   }
   window.addEventListener('resize', handleResize)
 })
@@ -2261,8 +3207,23 @@ const handleResize = () => {
 watch(projects, () => {
   if (activeMenu.value === 'overview') {
     nextTick(() => initCharts())
+  } else if (activeMenu.value === 'invested') {
+    nextTick(() => initInvestedCharts())
   }
 }, { deep: true })
+
+watch(investedProjects, (list) => {
+  if (!list.length) {
+    selectedInvestedProjectId.value = null
+    return
+  }
+  if (!list.some(item => item.id === selectedInvestedProjectId.value)) {
+    selectedInvestedProjectId.value = list[0].id
+  }
+  if (activeMenu.value === 'invested') {
+    nextTick(() => initInvestedCharts())
+  }
+}, { immediate: true })
 
 </script>
 
@@ -2688,6 +3649,181 @@ html, body, #app {
   overflow-x: auto;
 }
 
+.invested-stat-card {
+  text-align: center;
+  border-color: #e2e8f0;
+  background: #ffffff;
+}
+
+.invested-stat-value {
+  font-size: 20px;
+  line-height: 1.2;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', 'Public Sans', sans-serif;
+}
+
+.invested-chart-container {
+  width: 100%;
+  height: 260px;
+}
+
+.invested-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.invested-list-card,
+.invested-detail-card {
+  border-radius: 8px;
+}
+
+.invested-card-header,
+.invested-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invested-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 355px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.invested-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.invested-project-item {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.invested-project-item:hover,
+.invested-project-item.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.invested-project-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.invested-project-name {
+  min-width: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.invested-project-sub {
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.invested-project-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.invested-detail-title {
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.invested-detail-company {
+  color: #64748b;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.invested-detail-actions {
+  flex: 0 0 auto;
+}
+
+.invested-detail-section-title {
+  margin: 18px 0 10px;
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.valuation-change {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.valuation-change.up {
+  color: #16a34a;
+}
+
+.valuation-change.down {
+  color: #dc2626;
+}
+
+.valuation-change.neutral {
+  color: #64748b;
+}
+
+.invested-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 16px;
+  margin-top: 14px;
+}
+
+.invested-section-title {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.invested-section-content {
+  color: #374151;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .invested-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .invested-project-list {
+    max-height: none;
+  }
+}
+
 .fade-in {
   animation: fadeIn 0.5s ease-in-out;
 }
@@ -2701,6 +3837,7 @@ html, body, #app {
 .mb-4 { margin-bottom: 1rem; }
 .mb-6 { margin-bottom: 1.5rem; }
 .mt-4 { margin-top: 1rem; }
+.mt-1 { margin-top: 0.25rem; }
 .p-4 { padding: 1rem; }
 .hidden { display: none; }
 .w-full { width: 100%; }
