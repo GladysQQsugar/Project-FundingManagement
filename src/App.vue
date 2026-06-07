@@ -9,7 +9,7 @@
     >
       <div class="logo">
         <el-icon :size="24" color="#fff" class="shrink-0"><DataAnalysis /></el-icon>
-        <span v-show="!isCollapsed || isMobile" class="logo-title">武汉人才集团基金矩阵</span>
+        <span v-show="!isCollapsed || isMobile" class="logo-title">XX集团基金矩阵</span>
       </div>
 
       <!-- 收起/展开切换按钮 (桌面端) -->
@@ -1057,18 +1057,17 @@ import {
 } from '@element-plus/icons-vue'
 
 // --- 词典与标准化工具 ---
-const defaultFunds = ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）', '待定']
+const defaultFunds = ['XX一号基金', 'XX二号基金', 'XX三号基金（筹备中）', '待定']
 const defaultSources = ['政府推荐', '园区推荐', '高校院所推荐', 'FA推荐', '机构推荐', '股东/LP推荐', '路演活动', '自主挖掘', '企业主动申报', '历史储备项目', '其他']
 const defaultFundAliases = {
-  '人才基金': '人才创新创业基金',
-  '人才创新基金': '人才创新创业基金',
-  '人才创新创业基金': '人才创新创业基金',
-  '武创星': '武创星基金',
-  '武创星基金': '武创星基金',
-  '筹备中': '第三支基金（筹备中）',
-  '未成立': '第三支基金（筹备中）',
-  '未成立/筹备中': '第三支基金（筹备中）',
-  '第三支基金（筹备中）': '第三支基金（筹备中）'
+  '一号基金': 'XX一号基金',
+  'XX一号基金': 'XX一号基金',
+  '二号基金': 'XX二号基金',
+  'XX二号基金': 'XX二号基金',
+  '筹备中': 'XX三号基金（筹备中）',
+  '未成立': 'XX三号基金（筹备中）',
+  '未成立/筹备中': 'XX三号基金（筹备中）',
+  'XX三号基金（筹备中）': 'XX三号基金（筹备中）'
 }
 const fundAliases = reactive({ ...defaultFundAliases })
 
@@ -1295,36 +1294,36 @@ const dictLabels = {
 
 // --- 模拟数据生成 ---
 const mockData = [
-  { id: 1, name: '硅基光子芯片研发项目', company: '武汉芯光科技有限公司', fund: '人才创新创业基金', stage: '立项阶段', isKey: '是', source: '自主挖掘', year: '2025-01', industry965Category: '9大支柱产业', industry965Direction: '光芯屏端网', manager: '张经理', priority: '高', progress: '已完成初步软硬件验证。' },
+  { id: 1, name: '硅基光子芯片研发项目', company: 'XX科技有限公司', fund: 'XX一号基金', stage: '立项阶段', isKey: '是', source: '自主挖掘', year: '2025-01', industry965Category: '9大支柱产业', industry965Direction: '光芯屏端网', manager: '张经理', priority: '高', progress: '已完成初步软硬件验证。' },
   {
-    id: 2, name: 'AI无人驾驶系统', company: '智慧行科技', fund: '武创星基金', stage: '已投决待交割', isKey: '是', source: '园区推荐', year: '2024-10', industry965Category: '6大战略性新兴产业', industry965Direction: '人工智能', subField: '自动驾驶算法', location: '武汉', officeLocation: '武汉光谷', manager: '李主任', priority: '高', progress: '投决已通过，交割资料准备中。', remark: '需跟踪下一轮融资窗口。',
+    id: 2, name: 'AI无人驾驶系统', company: 'XX智能科技有限公司', fund: 'XX二号基金', stage: '已投决待交割', isKey: '是', source: '园区推荐', year: '2024-10', industry965Category: '6大战略性新兴产业', industry965Direction: '人工智能', subField: '自动驾驶算法', location: 'XX市', officeLocation: 'XX产业园', manager: '李主任', priority: '高', progress: '投决已通过，交割资料准备中。', remark: '需跟踪下一轮融资窗口。',
     investmentAmount: '2000万元', shareholdingRatio: '8%', investmentDate: '2025-02', closingDate: '', initialPostValuation: '2.5亿元', latestValuation: '3.2亿元', valuationUpdateDate: '2025-05', round: 'A轮',
     servedTalentCount: 18, employeeCount: 126, researcherCount: 64, highLevelTalentCount: 6, doctorCount: 8, masterCount: 35, registeredInWuhan: '是', taxedInWuhan: '是',
     latestOperationProgress: '已完成车路协同测试场景扩展，新增两家主机厂试点。', postInvestmentServices: '协助对接智能网联汽车场景和高层次人才政策。', riskStatus: '交割节奏受客户回款影响。', nextPlan: '推动交割材料闭环并跟进量产订单。', postLastUpdateDate: '2025-05-28'
   },
   {
-    id: 3, name: '重组蛋白药研发', company: '博奥生物', fund: '人才创新创业基金', stage: '已交割', isKey: '否', source: '高校院所推荐', year: '2023-05', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '创新药研发', location: '武汉', officeLocation: '武汉东湖高新区', manager: '王工', priority: '中', progress: '已于去年完成1500万注资。', remark: '持续关注临床前数据。',
+    id: 3, name: '重组蛋白药研发', company: 'XX生物科技有限公司', fund: 'XX一号基金', stage: '已交割', isKey: '否', source: '高校院所推荐', year: '2023-05', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '创新药研发', location: 'XX市', officeLocation: 'XX高新区', manager: '王工', priority: '中', progress: '已于去年完成1500万注资。', remark: '持续关注临床前数据。',
     investmentAmount: '1500万元', shareholdingRatio: '6%', investmentDate: '2023-09', closingDate: '2023-10', initialPostValuation: '2.5亿元', latestValuation: '2.5亿元', valuationUpdateDate: '2025-04', round: 'Pre-A轮',
     servedTalentCount: 12, employeeCount: 82, researcherCount: 48, highLevelTalentCount: 5, doctorCount: 12, masterCount: 26, registeredInWuhan: '是', taxedInWuhan: '是',
     latestOperationProgress: '核心管线完成药效验证，正在推进CMC工艺放大。', postInvestmentServices: '协助申报人才项目和对接临床资源。', riskStatus: '研发周期较长，短期收入贡献有限。', nextPlan: '跟进下一批动物实验数据和专利布局。', postLastUpdateDate: '2025-05-20'
   },
   {
-    id: 4, name: '氢能源电池PACK', company: '绿能动力', fund: '第三支基金（筹备中）', stage: '已投决待交割', isKey: '否', source: 'FA推荐', year: '2025-02', industry965Category: '6大战略性新兴产业', industry965Direction: '氢能', subField: '燃料电池系统', location: '襄阳', officeLocation: '武汉经开区', manager: '赵经理', priority: '中', progress: '投决通过，等待工商和协议附件完善。', remark: '估值待交割前复核。',
+    id: 4, name: '氢能源电池PACK', company: 'XX能源科技有限公司', fund: 'XX三号基金（筹备中）', stage: '已投决待交割', isKey: '否', source: 'FA推荐', year: '2025-02', industry965Category: '6大战略性新兴产业', industry965Direction: '氢能', subField: '燃料电池系统', location: 'XX市', officeLocation: 'XX经开区', manager: '赵经理', priority: '中', progress: '投决通过，等待工商和协议附件完善。', remark: '估值待交割前复核。',
     investmentAmount: '1200万元', shareholdingRatio: '5%', investmentDate: '2025-04', closingDate: '', initialPostValuation: '', latestValuation: '', valuationUpdateDate: '', round: 'A轮',
     servedTalentCount: 6, employeeCount: 95, researcherCount: 31, highLevelTalentCount: 2, doctorCount: 3, masterCount: 18, registeredInWuhan: '否', taxedInWuhan: '否',
-    latestOperationProgress: '样机进入整车厂联合测试，武汉研发中心筹备中。', postInvestmentServices: '协调在汉注册和产业园落地政策咨询。', riskStatus: '异地注册和客户验证进度存在不确定性。', nextPlan: '推动武汉主体设立和交割条件确认。', postLastUpdateDate: '2025-05-18'
+    latestOperationProgress: '样机进入整车厂联合测试，XX研发中心筹备中。', postInvestmentServices: '协调属地注册和产业园落地政策咨询。', riskStatus: '异地注册和客户验证进度存在不确定性。', nextPlan: '推动属地主体设立和交割条件确认。', postLastUpdateDate: '2025-05-18'
   },
-  { id: 5, name: '量子加密路由器', company: '量子盾牌', fund: '武创星基金', stage: '投决阶段', isKey: '是', source: '路演活动', year: '2025-03', industry965Category: '5大未来产业', industry965Direction: '量子科技', manager: '张经理', priority: '高', progress: '已过初评，待上投决会。' },
-  { id: 6, name: '深海探测机器人', company: '深海之眼', fund: '人才创新创业基金、武创星基金', stage: '储备项目', isKey: '待判断', source: '自主挖掘', year: '2024-12', industry965Category: '5大未来产业', industry965Direction: '深地深海深空', manager: '钱工', priority: '低', progress: '信息收集阶段。' },
+  { id: 5, name: '量子加密路由器', company: 'XX信息安全有限公司', fund: 'XX二号基金', stage: '投决阶段', isKey: '是', source: '路演活动', year: '2025-03', industry965Category: '5大未来产业', industry965Direction: '量子科技', manager: '张经理', priority: '高', progress: '已过初评，待上投决会。' },
+  { id: 6, name: '深海探测机器人', company: 'XX机器人有限公司', fund: 'XX一号基金、XX二号基金', stage: '储备项目', isKey: '待判断', source: '自主挖掘', year: '2024-12', industry965Category: '5大未来产业', industry965Direction: '深地深海深空', manager: '钱工', priority: '低', progress: '信息收集阶段。' },
   {
-    id: 7, name: '工业4.0视觉检测', company: '精测科技', fund: '武创星基金', stage: '已投决待交割', isKey: '是', source: '历史储备项目', year: '2023-11', industry965Category: '9大支柱产业', industry965Direction: '高端装备制造', subField: '机器视觉检测', location: '武汉', officeLocation: '武汉光谷', manager: '孙组长', priority: '高', progress: '手续最后签署中。', remark: '产业协同空间较大。',
+    id: 7, name: '工业4.0视觉检测', company: 'XX检测科技有限公司', fund: 'XX二号基金', stage: '已投决待交割', isKey: '是', source: '历史储备项目', year: '2023-11', industry965Category: '9大支柱产业', industry965Direction: '高端装备制造', subField: '机器视觉检测', location: 'XX市', officeLocation: 'XX产业园', manager: '孙组长', priority: '高', progress: '手续最后签署中。', remark: '产业协同空间较大。',
     investmentAmount: '1800万元', shareholdingRatio: '7.5%', investmentDate: '2025-01', closingDate: '', initialPostValuation: '2.4亿元', latestValuation: '2.1亿元', valuationUpdateDate: '2025-05', round: 'B轮',
     servedTalentCount: 21, employeeCount: 210, researcherCount: 76, highLevelTalentCount: 4, doctorCount: 5, masterCount: 42, registeredInWuhan: '是', taxedInWuhan: '是',
     latestOperationProgress: '新签两条产线视觉检测订单，但毛利率短期承压。', postInvestmentServices: '协助对接智能制造客户和研发补贴申报。', riskStatus: '应收账款周期拉长，需关注现金流。', nextPlan: '跟踪交割完成和重点客户回款。', postLastUpdateDate: '2025-05-26'
   },
-  { id: 8, name: '新型碳纤维材料', company: '强力复材', fund: '人才创新创业基金', stage: '暂缓跟进', isKey: '否', source: '园区推荐', year: '2022-09', industry965Category: '待分类', industry965Direction: '待分类', manager: '周经理', priority: '中', progress: '由于估值分歧暂缓。' },
+  { id: 8, name: '新型碳纤维材料', company: 'XX新材料有限公司', fund: 'XX一号基金', stage: '暂缓跟进', isKey: '否', source: '园区推荐', year: '2022-09', industry965Category: '待分类', industry965Direction: '待分类', manager: '周经理', priority: '中', progress: '由于估值分歧暂缓。' },
   {
-    id: 9, name: '爱楷医疗', company: '武汉爱楷医疗科技有限公司', fund: '人才创新创业基金', stage: '已交割', isKey: '是', source: '机构推荐', year: '2024-03', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '医疗器械', location: '武汉', officeLocation: '武汉光谷生物城', manager: '陈经理', priority: '高', progress: '已完成投资交割并进入投后服务期。', remark: '重点支持人才团队建设。',
+    id: 9, name: 'XX医疗器械项目', company: 'XX医疗科技有限公司', fund: 'XX一号基金', stage: '已交割', isKey: '是', source: '机构推荐', year: '2024-03', industry965Category: '9大支柱产业', industry965Direction: '大健康和生物技术', subField: '医疗器械', location: 'XX市', officeLocation: 'XX生物城', manager: '陈经理', priority: '高', progress: '已完成投资交割并进入投后服务期。', remark: '重点支持人才团队建设。',
     investmentAmount: '1000万元', shareholdingRatio: '4.8%', investmentDate: '2024-06', closingDate: '2024-07', initialPostValuation: '2.08亿元', latestValuation: '2.9亿元', valuationUpdateDate: '2025-05', round: 'A轮',
     servedTalentCount: 25, employeeCount: 138, researcherCount: 69, highLevelTalentCount: 8, doctorCount: 10, masterCount: 39, registeredInWuhan: '是', taxedInWuhan: '是',
     latestOperationProgress: '二类医疗器械产品进入注册检测阶段，新增三甲医院合作。', postInvestmentServices: '协助高层次人才认定、临床资源对接和融资材料梳理。', riskStatus: '注册审批周期可能拉长。', nextPlan: '持续跟踪注册检测节点和下一轮融资进展。', postLastUpdateDate: '2025-05-30'
@@ -1440,7 +1439,7 @@ const defaultForm = {
   industry965Category: '待分类',
   industry965Direction: '待分类',
   subField: '',
-  location: '武汉',
+  location: 'XX市',
   officeLocation: '',
   round: '',
   amount: '',
@@ -2854,7 +2853,7 @@ const exportInvestedData = () => {
 
 const downloadTemplate = () => {
   let csvContent = '\uFEFF' + coreExportHeaders.join(',') + '\n'
-  csvContent += '示例项目,示例企业,人才创新创业基金,储备项目,否,自主挖掘,2025年1月,成长投,无,人工智能,6大战略性新兴产业,人工智能,视觉,武汉,A轮,5000万,张三,中,进展良好,无'
+  csvContent += '示例项目,XX企业,XX一号基金,储备项目,否,自主挖掘,2025年1月,成长投,无,人工智能,6大战略性新兴产业,人工智能,视觉,XX市,A轮,5000万,张三,中,进展良好,无'
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
