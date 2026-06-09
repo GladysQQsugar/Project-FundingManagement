@@ -120,7 +120,7 @@
                     </div>
                   </div>
                 </template>
-                <div class="text-blue-900 leading-relaxed indent-8 text-sm md:text-base">
+                <div class="text-blue-900 leading-relaxed whitespace-pre-line text-sm md:text-base">
                   {{ summaryText }}
                 </div>
               </el-card>
@@ -159,7 +159,7 @@
           <!-- 统计快报 -->
           <el-row :gutter="20" class="mb-4">
             <el-col :span="24">
-              <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <el-card v-for="item in libraryStats" :key="item.label" shadow="never" class="text-center py-1 border-slate-100 bg-slate-50/50">
                   <div class="text-[10px] md:text-xs text-gray-500 mb-1">{{ item.label }}</div>
                   <div class="text-base md:text-xl font-bold font-mono" :class="item.class">{{ item.value }}</div>
@@ -197,12 +197,6 @@
               <el-form-item label="重点推进" class="mobile-half">
                 <el-select v-model="filters.isKey" placeholder="全部" clearable @change="handleFilter" class="mobile-full-input" style="width: 100px">
                   <el-option v-for="item in dicts.isKeyOptions" :key="item" :label="item" :value="item" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="疑似重复" class="mobile-half">
-                <el-select v-model="filters.isDuplicate" placeholder="全部" clearable @change="handleFilter" class="mobile-full-input" style="width: 100px">
-                  <el-option label="是" value="是" />
-                  <el-option label="否" value="否" />
                 </el-select>
               </el-form-item>
               <el-form-item label="收集年月" class="mobile-full">
@@ -412,7 +406,7 @@
                   </div>
                   <div class="invested-project-sub">{{ item.company || '企业名称未填写' }}</div>
                   <div class="invested-project-meta">
-                    <span>{{ item._fundNames?.join('、') || item.fund || '待定' }}</span>
+                    <span>{{ item._fundNames?.join('、') || item.fund || '-' }}</span>
                     <span>最新估值：{{ displayValue(item.latestValuation) }}</span>
                   </div>
                   <div class="invested-project-meta mt-1">
@@ -463,7 +457,7 @@
               <el-table-column prop="name" label="项目名称" min-width="180" fixed />
               <el-table-column prop="company" label="企业名称" min-width="160" />
               <el-table-column label="所属基金" min-width="180">
-                <template #default="scope">{{ scope.row._fundNames?.join('、') || scope.row.fund || '待定' }}</template>
+                <template #default="scope">{{ scope.row._fundNames?.join('、') || scope.row.fund || '-' }}</template>
               </el-table-column>
               <el-table-column label="退出时间" width="130">
                 <template #default="scope">{{ formatDateCN(scope.row.exitDate) || '-' }}</template>
@@ -606,7 +600,7 @@
         <el-descriptions :column="isMobile ? 1 : 3" border class="mb-4">
           <el-descriptions-item label="项目名称">{{ displayValue(selectedInvestedProject.name) }}</el-descriptions-item>
           <el-descriptions-item label="企业名称">{{ displayValue(selectedInvestedProject.company) }}</el-descriptions-item>
-          <el-descriptions-item label="所属基金">{{ selectedInvestedProject._fundNames?.join('、') || selectedInvestedProject.fund || '待定' }}</el-descriptions-item>
+          <el-descriptions-item label="所属基金">{{ selectedInvestedProject._fundNames?.join('、') || selectedInvestedProject.fund || '-' }}</el-descriptions-item>
           <el-descriptions-item label="投资状态">
             <el-tag :type="getStageTagType(selectedInvestedProject.stage)">{{ selectedInvestedProject.stage }}</el-tag>
           </el-descriptions-item>
@@ -768,13 +762,6 @@
           <el-divider content-position="left"><el-icon><Grid /></el-icon> 行业与分类</el-divider>
 
           <el-row :gutter="20">
-            <el-col :xs="24" :sm="12">
-              <el-form-item label="系统标准行业">
-                <el-select v-model="form.standardIndustry" class="w-full">
-                  <el-option v-for="item in dicts.standardIndustries" :key="item" :label="item" :value="item" />
-                </el-select>
-              </el-form-item>
-            </el-col>
             <el-col :xs="24" :sm="12">
               <el-form-item label="原始行业">
                 <el-input v-model="form.originalIndustry" />
@@ -1057,7 +1044,7 @@ import {
 } from '@element-plus/icons-vue'
 
 // --- 词典与标准化工具 ---
-const defaultFunds = ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）', '待定']
+const defaultFunds = ['人才创新创业基金', '武创星基金', '第三支基金（筹备中）']
 const defaultSources = ['政府推荐', '园区推荐', '高校院所推荐', 'FA推荐', '机构推荐', '股东/LP推荐', '路演活动', '自主挖掘', '企业主动申报', '历史储备项目', '其他']
 const defaultFundAliases = {
   '人才基金': '人才创新创业基金',
@@ -1073,8 +1060,9 @@ const defaultFundAliases = {
 const fundAliases = reactive({ ...defaultFundAliases })
 
 const normalizeFundName = (val) => {
-  if (!val) return "待定";
+  if (!val) return "";
   const text = String(val).trim();
+  if (text === '待定') return "";
   if (fundAliases[text]) return fundAliases[text];
   return text;
 };
@@ -1091,13 +1079,13 @@ const normalizeProjectStage = (val) => {
 }
 
 const parseFundNames = (val) => {
-  if (!val) return ["待定"];
+  if (!val) return [];
   let text = String(val).trim();
   
   // 拆分支持的各种分隔符
   const parts = text.split(/[、，,/;；+/\s]+/).filter(i => i)
-  if (parts.length === 0) return ["待定"]
-  return [...new Set(parts.map(p => normalizeFundName(p)))]
+  if (parts.length === 0) return []
+  return [...new Set(parts.map(p => normalizeFundName(p)).filter(Boolean))]
 }
 
 const normalizeCollectMonth = (val) => {
@@ -1181,8 +1169,8 @@ const investedExtraKeys = [
   'registeredInWuhan', 'taxedInWuhan', 'latestOperationProgress', 'postInvestmentServices', 'riskStatus', 'nextPlan', 'postLastUpdateDate'
 ]
 
-const coreExportHeaders = ['项目名称', '企业名称', '所属基金', '当前阶段', '是否重点推进', '项目来源', '收集年月', '项目类型', '原始行业', '系统标准行业', '965大类', '965产业方向', '细分领域', '注册地', '融资轮次', '本轮融资金额', '项目负责人', '项目优先级', '当前进展', '备注']
-const coreExportKeys = ['name', 'company', 'fund', 'stage', 'isKey', 'source', 'year', 'type', 'originalIndustry', 'standardIndustry', 'industry965Category', 'industry965Direction', 'subField', 'location', 'round', 'amount', 'manager', 'priority', 'progress', 'remark']
+const coreExportHeaders = ['项目名称', '企业名称', '所属基金', '当前阶段', '是否重点推进', '项目来源', '收集年月', '项目类型', '原始行业', '965大类', '965产业方向', '细分领域', '注册地', '融资轮次', '本轮融资金额', '项目负责人', '项目优先级', '当前进展', '备注']
+const coreExportKeys = ['name', 'company', 'fund', 'stage', 'isKey', 'source', 'year', 'type', 'originalIndustry', 'industry965Category', 'industry965Direction', 'subField', 'location', 'round', 'amount', 'manager', 'priority', 'progress', 'remark']
 const exportHeaders = [...coreExportHeaders, ...investedExtraHeaders]
 const exportKeys = [...coreExportKeys, ...investedExtraKeys]
 
@@ -1263,12 +1251,7 @@ const dicts = {
     '5大未来产业': ['电磁能', '量子科技', '超级计算', '脑科学和类脑科学', '深地深海深空'],
     '待分类': ['待分类'],
     '其他': ['其他']
-  },
-  standardIndustries: [
-    '新一代信息技术', '人工智能', '集成电路', '光电子信息', '高端装备', '智能制造',
-    '汽车与新能源车', '新能源', '新材料', '节能环保', '生物医药', '医疗器械', '大健康',
-    '数字经济', '现代服务业', '文化创意', '消费', '农业科技', '其他', '待分类'
-  ]
+  }
 }
 
 const displayDicts = computed(() => {
@@ -1278,8 +1261,7 @@ const displayDicts = computed(() => {
     isKey: dicts.isKeyOptions,
     sources: dicts.sources,
     priorities: dicts.priorities,
-    categories: dicts.industry965Categories,
-    industries: dicts.standardIndustries
+    categories: dicts.industry965Categories
   }
 })
 
@@ -1289,8 +1271,7 @@ const dictLabels = {
   isKey: '重点推进',
   sources: '项目来源',
   priorities: '优先级',
-  categories: '965工作大类',
-  industries: '系统标准行业'
+  categories: '965工作大类'
 }
 
 // --- 模拟数据生成 ---
@@ -1428,15 +1409,14 @@ const defaultForm = {
   id: null,
   name: '',
   company: '',
-  fund: '待定',
-  fundSelections: ['待定'],
+  fund: '',
+  fundSelections: [''],
   stage: '储备项目',
   isKey: '否',
   source: '自主挖掘',
   year: new Date().getFullYear().toString(),
   type: '',
   originalIndustry: '',
-  standardIndustry: '待分类',
   industry965Category: '待分类',
   industry965Direction: '待分类',
   subField: '',
@@ -1505,7 +1485,6 @@ const filteredProjects = computed(() => {
   const f_isKey = filters.isKey;
   const f_cat = filters.industry965Category;
   const f_dir = filters.industry965Direction;
-  const f_dup = filters.isDuplicate;
   const f_onlyUn = filters.onlyUnclassified;
   const f_start = filters.collectMonthStart;
   const f_end = filters.collectMonthEnd;
@@ -1543,45 +1522,18 @@ const filteredProjects = computed(() => {
     if (f_cat && p.industry965Category !== f_cat) return false;
     if (f_dir && p.industry965Direction !== f_dir) return false;
     
-    // 疑似重复
-    if (f_dup === '是' || f_dup === true) {
-      if (!p._isDuplicate) return false;
-    } else if (f_dup === '否') {
-      if (p._isDuplicate) return false;
-    }
-
     return true;
   }).sort((a, b) => (b.id || 0) - (a.id || 0))
 })
 
 const libraryStats = computed(() => {
   const all = projects.value.length
-  const filtered = filteredProjects.value.length
   const keys = projects.value.filter(p => p.isKey === '是').length
-  const dups = projects.value.filter(p => p._isDuplicate).length
   const unclassified = projects.value.filter(p => isUnclassified(p)).length
-  
-  // 核心去重计数 (独立于筛选的全局全量去重库中项目)
-  const uniqueCount = projects.value.filter(p => {
-    // 这里简单定义：如果不标记为重复，或者是重复项集合中第一个
-    // 其实有了 _isDuplicate 之后，去重总数可以直接利用 Map 计算，或者直接算不被标记为 _isDuplicate 的数量？
-    // 不对，_isDuplicate 标记的是“凡是名字企业一样的都标记为重复”。
-    return !p._isDuplicate;
-  }).length;
-  
-  // 修正：正确的去重总数计算
-  const dupMap = new Map();
-  projects.value.forEach(p => {
-    const key = `${(p.name || '').trim()}_${(p.company || '').trim()}`;
-    if (p.name) dupMap.set(key, 1);
-  });
-  const deDupAllCount = dupMap.size;
 
   return [
     { label: '储备总数', value: all, class: 'text-slate-800' },
-    { label: '去重项目', value: deDupAllCount, class: 'text-indigo-600' },
     { label: '重点推进', value: keys, class: 'text-red-500' },
-    { label: '疑似重复', value: dups, class: 'text-rose-600' },
     { label: '未分类项目', value: unclassified, class: 'text-amber-600' }
   ]
 })
@@ -1604,35 +1556,38 @@ const completeness = computed(() => {
   return {}
 })
 
+const getSummaryFundName = (fund) => {
+  if (fund === '第三支基金（筹备中）') return '未成立/筹备中基金'
+  return fund
+}
+
 const fundSummaryParts = (items) => {
   return dicts.funds
-    .map(fund => ({
-      fund,
-      count: items.filter(p => p._fundNames.includes(fund)).length
-    }))
-    .filter(item => item.count > 0 && item.fund !== '待定')
-    .map(item => `${item.fund}储备项目 ${item.count} 条`)
+    .map(fund => {
+      const fundProjects = items.filter(p => p._fundNames.includes(fund))
+      return {
+        fund,
+        reserveCount: fundProjects.length,
+        pendingClosingCount: fundProjects.filter(p => p.stage === '已投决待交割').length,
+        deliveredCount: fundProjects.filter(p => p.stage === '已交割').length,
+        servedTalentCount: fundProjects.reduce((sum, project) => sum + parseCountValue(project.servedTalentCount), 0)
+      }
+    })
+    .map(item => `${getSummaryFundName(item.fund)}储备项目 ${item.reserveCount} 个，已投决待交割项目 ${item.pendingClosingCount} 个，已交割项目 ${item.deliveredCount} 个，服务人才数量 ${item.servedTalentCount} 个`)
+}
+
+const formatFundSummaryText = (items) => {
+  const fundSummary = fundSummaryParts(items)
+  return fundSummary.length ? `其中，${fundSummary.join('；')}。` : ''
 }
 
 const summaryText = computed(() => {
   if (projects.value.length === 0) return "系统内尚无数据。请导入项目数据以生成摘要。"
   
   const total = projects.value.length
-  const fundSummary = fundSummaryParts(projects.value)
-  const fundSummaryText = fundSummary.length ? `其中，${fundSummary.join('，')}。` : ''
-  
-  // 使用 Map 一次性计算去重
-  const getDeDupCount = (items) => {
-     const seen = new Set();
-     items.forEach(p => {
-       const key = `${(p.name || '').trim()}_${(p.company || '').trim()}`;
-       if (p.name) seen.add(key);
-     });
-     return seen.size;
-  };
-  const deDupAllCount = getDeDupCount(projects.value);
+  const fundSummaryText = formatFundSummaryText(projects.value)
 
-  let baseText = `截至当前，系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。${fundSummaryText}注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
+  let baseText = `当前系统共储备项目 ${total} 个。${fundSummaryText}`
 
   if (filters.summaryStart || filters.summaryEnd) {
     const fStart = filters.summaryStart;
@@ -1652,33 +1607,12 @@ const summaryText = computed(() => {
       if (pStartNum > fEndNum || pEndNum < fStartNum) return false;
       return true
     })
-    
-    const deDupPeriodCount = getDeDupCount(periodProjects)
-    
-    const dirCounts = {}
-    periodProjects.forEach(p => {
-      const d = p.industry965Direction || '未分类'
-      if (d && !['待分类', '其他', '未分类'].includes(d)) {
-        dirCounts[d] = (dirCounts[d] || 0) + 1
-      }
-    })
-    const top3 = Object.entries(dirCounts).sort((a,b) => b[1] - a[1]).slice(0, 3).map(i => i[0])
-    const concentText = top3.length ? top3.join('、') : '暂未形成明显集中方向'
-    const periodDeep = periodProjects.filter(p => ['尽调阶段', '投决阶段', '已投决待交割', '已交割'].includes(p.stage)).length
 
     const startStr = formatCollectMonthCN(filters.summaryStart) || '开始'
     const endStr = formatCollectMonthCN(filters.summaryEnd) || '当前'
-    
-    baseText += ` 在 ${startStr} 至 ${endStr} 期间，系统新增储备项目 ${periodProjects.length} 条，去重后新增项目 ${deDupPeriodCount} 个，主要集中在 ${concentText} 等产业方向，进入尽调及以后阶段的项目共 ${periodDeep} 个。`
-  } else {
-    const dirCounts = {}
-    projects.value.forEach(p => {
-      const d = p.industry965Direction || '未分类'
-      if (d && !['待分类', '其他', '未分类'].includes(d)) dirCounts[d] = (dirCounts[d] || 0) + 1
-    })
-    const top3 = Object.entries(dirCounts).sort((a,b) => b[1] - a[1]).slice(0, 3).map(i => i[0])
-    const deepWork = projects.value.filter(p => ['尽调阶段', '投决阶段', '已投决待交割', '已交割'].includes(p.stage)).length
-    baseText = `当前系统共收录储备项目 ${total} 条，去重后项目 ${deDupAllCount} 个。${fundSummaryText}项目主要集中在 ${top3.length ? top3.join('、') : '多个'} 等产业方向，当前进入尽调及以后阶段的项目共 ${deepWork} 个。注：同一项目可同时纳入多个基金储备池，因此各基金数量合计可能大于去重后项目数量。`
+    const periodFundSummaryText = formatFundSummaryText(periodProjects)
+
+    baseText += `\n\n在 ${startStr} 至 ${endStr} 期间，系统新增储备项目 ${periodProjects.length} 个。${periodFundSummaryText}`
   }
 
   return baseText
@@ -1775,7 +1709,6 @@ const availableInvestedDirections = computed(() => {
 
 const investedChartDataFund = computed(() => {
   return dicts.funds
-    .filter(fund => fund !== '待定')
     .map(fund => ({
       name: fund,
       value: investedProjects.value.filter(project => project._fundNames?.includes(fund)).length
@@ -1877,25 +1810,24 @@ const statCards = computed(() => {
   const total = projects.value.length
   const fundColors = ['#2563eb', '#7c3aed', '#0891b2', '#0f766e', '#9333ea', '#be123c', '#0369a1']
   const fundCards = dicts.funds
-    .filter(fund => fund !== '待定')
     .map((fund, index) => ({
       label: fund,
       value: projects.value.filter(p => p._fundNames.includes(fund)).length,
       color: fundColors[index % fundColors.length]
     }))
   
-  const keyCount = projects.value.filter(p => p.isKey === '是' || p.isKey === true).length
-  const inProgressCount = projects.value.filter(p => ['立项阶段', '尽调阶段', '投决阶段', '已投决待交割'].includes(p.stage)).length
+  const votingStageCount = projects.value.filter(p => p.stage === '投决阶段').length
+  const pendingClosingCount = projects.value.filter(p => p.stage === '已投决待交割').length
   const deliveredCount = projects.value.filter(p => p.stage === '已交割').length
-  const dupCount = projects.value.filter(p => p._isDuplicate).length
+  const servedTalentTotal = projects.value.reduce((sum, project) => sum + parseCountValue(project.servedTalentCount), 0)
 
   return [
     { label: '项目记录数', value: total, color: '#1e3a8a' },
     ...fundCards,
-    { label: '重点推进', value: keyCount, color: '#dc2626' },
-    { label: '在推进项目', value: inProgressCount, color: '#ea580c' },
+    { label: '投决阶段', value: votingStageCount, color: '#dc2626' },
+    { label: '已投决待交割', value: pendingClosingCount, color: '#ea580c' },
     { label: '已交割', value: deliveredCount, color: '#16a34a' },
-    { label: '疑似重复数', value: dupCount, color: '#f43f5e' }
+    { label: '服务人才数量', value: servedTalentTotal, color: '#7c3aed' }
   ]
 })
 
@@ -1916,10 +1848,10 @@ const normalizeFundSelections = (list) => {
 
 const syncFormFund = () => {
   const funds = normalizeFundSelections(form.fundSelections)
-  form.fundSelections = funds.length ? funds : ['待定']
+  form.fundSelections = funds.length ? funds : ['']
   form.fund = form.fundSelections.join('、')
   form.fundSelections.forEach(item => {
-    if (!dicts.funds.includes(item)) {
+    if (item && !dicts.funds.includes(item)) {
       dicts.funds.push(item)
       saveDictionarySettings()
     }
@@ -1964,8 +1896,8 @@ const loadDictionarySettings = () => {
     if (!saved) return
     const parsed = JSON.parse(saved)
     if (Array.isArray(parsed.funds)) {
-      const funds = parsed.funds.map(item => String(item).trim()).filter(Boolean)
-      dicts.funds.splice(0, dicts.funds.length, ...new Set([...funds, '待定']))
+      const funds = parsed.funds.map(item => String(item).trim()).filter(item => item && item !== '待定')
+      dicts.funds.splice(0, dicts.funds.length, ...new Set(funds))
     }
     if (parsed.aliases && typeof parsed.aliases === 'object') {
       Object.assign(fundAliases, parsed.aliases)
@@ -2012,10 +1944,6 @@ const addFundOption = () => {
 }
 
 const renameFundOption = (oldName) => {
-  if (oldName === '待定') {
-    ElMessage.warning('“待定”是系统默认兜底项，不建议重命名')
-    return
-  }
   ElMessageBox.prompt('请输入新的基金名称，保存后会同步更新已有项目记录', '更改基金名称', {
     confirmButtonText: '保存',
     cancelButtonText: '取消',
@@ -2058,14 +1986,9 @@ const renameFundOption = (oldName) => {
 }
 
 const deleteFundOption = (fundName) => {
-  if (fundName === '待定') {
-    ElMessage.warning('“待定”是系统默认兜底项，不能删除')
-    return
-  }
-
   const usedCount = projects.value.filter(project => project._fundNames?.includes(fundName)).length
   const message = usedCount
-    ? `当前有 ${usedCount} 个项目使用“${fundName}”。删除后会同步从这些项目的所属基金中移除；如果项目没有其他所属基金，将自动改为“待定”。确定删除吗？`
+    ? `当前有 ${usedCount} 个项目使用“${fundName}”。删除后会同步从这些项目的所属基金中移除；如果项目没有其他所属基金，将清空所属基金。确定删除吗？`
     : `确定删除“${fundName}”吗？`
 
   ElMessageBox.confirm(message, '删除所属基金', {
@@ -2085,7 +2008,7 @@ const deleteFundOption = (fundName) => {
       const remainingFunds = parseFundNames(project.fund).filter(item => item !== fundName)
       return {
         ...project,
-        fund: (remainingFunds.length ? remainingFunds : ['待定']).join('、')
+        fund: remainingFunds.join('、')
       }
     }))
 
@@ -2853,8 +2776,9 @@ const exportInvestedData = () => {
 }
 
 const downloadTemplate = () => {
-  let csvContent = '\uFEFF' + coreExportHeaders.join(',') + '\n'
-  csvContent += '示例项目,示例企业,人才创新创业基金,储备项目,否,自主挖掘,2025年1月,成长投,无,人工智能,6大战略性新兴产业,人工智能,视觉,武汉,A轮,5000万,张三,中,进展良好,无'
+  const templateHeaders = [...coreExportHeaders, '服务人才数量']
+  let csvContent = '\uFEFF' + templateHeaders.join(',') + '\n'
+  csvContent += '示例项目,示例企业,人才创新创业基金,储备项目,否,自主挖掘,2025年1月,成长投,无,6大战略性新兴产业,人工智能,视觉,武汉,A轮,5000万,张三,中,进展良好,无,10'
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -2934,7 +2858,7 @@ const buildImportHeaderMap = (headers) => {
     '重点推进': 'isKey', '项目来源': 'source', '来源': 'source',
     '收集年月': 'year', '收集年份': 'year', '年份': 'year', '日期': 'year', '收集日期': 'year',
     '项目类型': 'type',
-    '原始行业': 'originalIndustry', '系统标准行业': 'standardIndustry',
+    '原始行业': 'originalIndustry',
     '965大类': 'industry965Category', '965产业方向': 'industry965Direction',
     '细分领域': 'subField', '注册地': 'location', '融资轮次': 'round',
     '本轮融资金额': 'amount', '项目负责人': 'manager', '进展': 'progress', '备注': 'remark',
