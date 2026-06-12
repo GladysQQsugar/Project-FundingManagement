@@ -1,6 +1,35 @@
 <!-- 基金项目可视化管理系统 -->
 <template>
-  <el-container class="layout-container" v-loading="isLoading" :element-loading-text="loadingText">
+  <div v-if="!currentUser" class="login-page" v-loading="isLoading" :element-loading-text="loadingText">
+    <div class="login-shell">
+      <section class="login-brand-panel">
+        <div class="login-brand-kicker">武汉人才集团</div>
+        <h1 class="login-brand-title">基金矩阵项目管理系统</h1>
+      </section>
+
+      <section class="login-card">
+        <div class="login-form-header">
+          <div>
+            <div class="login-title">账号登录</div>
+            <div class="login-subtitle">请输入账号密码</div>
+          </div>
+          <el-tag effect="plain" type="success">内网访问</el-tag>
+        </div>
+
+        <el-form @submit.prevent="login" class="login-form">
+          <el-form-item>
+            <el-input v-model="loginForm.username" placeholder="账号" size="large" autocomplete="username" :prefix-icon="UserFilled" />
+          </el-form-item>
+          <el-form-item>
+            <el-input v-model="loginForm.password" placeholder="密码" size="large" type="password" show-password autocomplete="current-password" :prefix-icon="Lock" @keyup.enter="login" />
+          </el-form-item>
+          <el-button type="primary" size="large" class="login-submit" @click="login">登录系统</el-button>
+        </el-form>
+      </section>
+    </div>
+  </div>
+
+  <el-container v-else class="layout-container" v-loading="isLoading" :element-loading-text="loadingText">
     <!-- 左侧菜单栏 -->
     <el-aside 
       :width="(isMobile && !isMobileMenuOpen) ? '0px' : (isCollapsed ? '64px' : '280px')" 
@@ -49,7 +78,7 @@
           <el-icon><Download /></el-icon>
           <span>数据导入导出</span>
         </el-menu-item>
-        <el-menu-item index="dictionary">
+        <el-menu-item v-if="isAdmin" index="dictionary">
           <el-icon><Collection /></el-icon>
           <span>系统字典</span>
         </el-menu-item>
@@ -74,7 +103,9 @@
           <h2 class="title">{{ menuTitle }}</h2>
         </div>
         <div class="header-right text-right">
+          <el-tag effect="plain" :type="isAdmin ? 'success' : 'warning'" class="update-time">{{ currentUser.username }} / {{ roleLabel }}</el-tag>
           <el-tag effect="plain" type="info" class="update-time">更新时间: {{ lastUpdateTime }}</el-tag>
+          <el-button link type="primary" @click="logout">退出</el-button>
           <el-badge :value="projects.length" type="primary">
             <span class="text-gray-600 font-medium total-count">项目总数</span>
           </el-badge>
@@ -225,7 +256,7 @@
               <el-form-item class="filter-actions md:ml-auto">
                 <div class="flex flex-wrap gap-2">
                   <el-button type="primary" plain icon="Filter" @click="filterUnclassified">未分类</el-button>
-                  <el-button type="primary" @click="openProjectDialog()">新增</el-button>
+                  <el-button type="primary" :disabled="!isAdmin" @click="openProjectDialog()">新增</el-button>
                   <el-button @click="resetFilters">重置</el-button>
                   <el-button type="success" @click="exportFilteredData">导出结果</el-button>
                 </div>
@@ -287,8 +318,8 @@
               <el-table-column prop="progress" label="进展" min-width="200" show-overflow-tooltip />
               <el-table-column label="操作" width="150" fixed="right">
                 <template #default="scope">
-                  <el-button link type="primary" @click="openProjectDialog(scope.row)">编辑</el-button>
-                  <el-button link type="danger" @click="handleDelete(scope.row)">删除</el-button>
+                  <el-button link type="primary" :disabled="!isAdmin" @click="openProjectDialog(scope.row)">编辑</el-button>
+                  <el-button link type="danger" :disabled="!isAdmin" @click="handleDelete(scope.row)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -482,7 +513,7 @@
               <el-table-column prop="exitRemark" label="退出备注" min-width="220" show-overflow-tooltip />
               <el-table-column label="操作" width="100" fixed="right">
                 <template #default="scope">
-                  <el-button link type="primary" @click="openProjectDialog(scope.row)">编辑</el-button>
+                  <el-button link type="primary" :disabled="!isAdmin" @click="openProjectDialog(scope.row)">编辑</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -520,7 +551,7 @@
               <div class="io-card-body">
                 <p class="io-description">批量导入项目到系统（支持 CSV 格式）。</p>
                 <div class="io-action-area">
-                  <el-button type="success" size="large" @click="triggerImport" class="px-10">
+                  <el-button type="success" size="large" :disabled="!isAdmin" @click="triggerImport" class="px-10">
                     <el-icon class="mr-2"><Upload /></el-icon> 上传 CSV 文件
                   </el-button>
                 </div>
@@ -536,10 +567,10 @@
             <el-card shadow="hover">
               <template #header><div class="io-card-header">系统维护</div></template>
               <div class="p-8 flex justify-center gap-12">
-                <el-button type="danger" plain size="large" @click="clearAllData">
+                <el-button type="danger" plain size="large" :disabled="!isAdmin" @click="clearAllData">
                   <el-icon class="mr-2"><Delete /></el-icon> 清空全部数据
                 </el-button>
-                <el-button type="info" plain size="large" @click="resetToMock">
+                <el-button type="info" plain size="large" :disabled="!isAdmin" @click="resetToMock">
                   <el-icon class="mr-2"><RefreshRight /></el-icon> 重置为示例数据
                 </el-button>
               </div>
@@ -555,7 +586,7 @@
                 <template #header>
                   <div class="dictionary-card-header">
                     <div class="font-bold">{{ dictLabels[key] }}</div>
-                    <el-button v-if="key === 'funds'" type="primary" plain size="small" :icon="Plus" @click="addFundOption">
+                    <el-button v-if="key === 'funds'" type="primary" plain size="small" :icon="Plus" :disabled="!isAdmin" @click="addFundOption">
                       添加基金
                     </el-button>
                   </div>
@@ -563,8 +594,8 @@
                 <div v-if="key === 'funds'" class="dictionary-fund-list">
                   <el-tag v-for="item in list" :key="item" type="info" effect="plain" class="editable-fund-tag">
                     <span>{{ item }}</span>
-                    <el-button :icon="Edit" text circle size="small" @click.stop="renameFundOption(item)" />
-                    <el-button :icon="Delete" text circle size="small" @click.stop="deleteFundOption(item)" />
+                    <el-button :icon="Edit" text circle size="small" :disabled="!isAdmin" @click.stop="renameFundOption(item)" />
+                    <el-button :icon="Delete" text circle size="small" :disabled="!isAdmin" @click.stop="deleteFundOption(item)" />
                   </el-tag>
                 </div>
                 <div v-else class="flex flex-wrap gap-2">
@@ -592,7 +623,7 @@
             <div class="invested-detail-company">{{ selectedInvestedProject.company || '企业名称未填写' }}</div>
           </div>
           <div class="invested-detail-actions">
-            <el-button type="primary" plain @click="openProjectDialog(selectedInvestedProject)">编辑资料</el-button>
+            <el-button type="primary" plain :disabled="!isAdmin" @click="openProjectDialog(selectedInvestedProject)">编辑资料</el-button>
           </div>
         </div>
 
@@ -1040,7 +1071,8 @@ import * as echarts from 'echarts'
 import { 
   Monitor, Fold, Expand, Download, Collection, DataAnalysis, 
   InfoFilled, Grid, Coin, Comment, Upload, Delete, 
-  RefreshRight, Filter, Search, Plus, Refresh, Edit
+  RefreshRight, Filter, Search, Plus, Refresh, Edit,
+  UserFilled, Lock
 } from '@element-plus/icons-vue'
 
 // --- 词典与标准化工具 ---
@@ -1076,6 +1108,37 @@ const normalizeProjectStage = (val) => {
   const text = String(val || '').trim()
   if (text === '终止/放弃') return '已退出'
   return text || '储备项目'
+}
+
+const normalizeIndustry965Category = (category, direction = '') => {
+  const text = String(category || '').replace(/\s/g, '').trim()
+  const aliases = {
+    '9大支柱': '9大支柱产业',
+    '九大支柱': '9大支柱产业',
+    '九大支柱产业': '9大支柱产业',
+    '9大支柱产业': '9大支柱产业',
+    '6大战略性新兴': '6大战略性新兴产业',
+    '六大战略性新兴': '6大战略性新兴产业',
+    '战略性新兴产业': '6大战略性新兴产业',
+    '六大战略性新兴产业': '6大战略性新兴产业',
+    '6大战略性新兴产业': '6大战略性新兴产业',
+    '5大未来': '5大未来产业',
+    '五大未来': '5大未来产业',
+    '五大未来产业': '5大未来产业',
+    '5大未来产业': '5大未来产业',
+    '待分类': '待分类',
+    '未分类': '待分类',
+    '其他': '其他'
+  }
+  if (aliases[text]) return aliases[text]
+
+  const directionText = String(direction || '').trim()
+  if (directionText) {
+    const matched = Object.entries(dicts.industry965Map).find(([, directions]) => directions.includes(directionText))
+    if (matched) return matched[0]
+  }
+
+  return text ? '其他' : '待分类'
 }
 
 const parseFundNames = (val) => {
@@ -1325,9 +1388,96 @@ const pageSize = ref(20)
 // 全局加载状态
 const isLoading = ref(false)
 const loadingText = ref('加载中...')
+const authToken = ref(localStorage.getItem('fund_auth_token') || '')
+const currentUser = ref(null)
+const loginForm = reactive({
+  username: '',
+  password: ''
+})
+const isAdmin = computed(() => currentUser.value?.role === 'admin')
+const roleLabel = computed(() => currentUser.value?.role === 'admin' ? '管理员' : '访客')
+const apiBase = import.meta.env.VITE_API_BASE || '/api'
+
+const apiRequest = async (path, options = {}) => {
+  const headers = {
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(authToken.value ? { Authorization: `Bearer ${authToken.value}` } : {}),
+    ...(options.headers || {})
+  }
+  const response = await fetch(`${apiBase}${path}`, { ...options, headers })
+  const data = await response.json().catch(() => ({}))
+  if (response.status === 401) {
+    logout(false)
+    throw new Error(data.message || '登录已过期，请重新登录')
+  }
+  if (!response.ok) throw new Error(data.message || '请求失败')
+  return data
+}
+
+const requireAdminAction = () => {
+  if (isAdmin.value) return true
+  ElMessage.warning('访客账号只有查看和导出权限')
+  return false
+}
+
+const login = async () => {
+  if (!loginForm.username || !loginForm.password) {
+    return ElMessage.warning('请输入账号和密码')
+  }
+  isLoading.value = true
+  loadingText.value = '正在登录...'
+  try {
+    const data = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(loginForm)
+    })
+    authToken.value = data.token
+    currentUser.value = data.user
+    localStorage.setItem('fund_auth_token', data.token)
+    loginForm.password = ''
+    await loadDictionarySettings()
+    await loadData()
+    ElMessage.success('登录成功')
+    nextTick(() => initCharts())
+  } catch (err) {
+    ElMessage.error(err.message || '登录失败')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const logout = (showMessage = true) => {
+  authToken.value = ''
+  currentUser.value = null
+  projects.value = []
+  localStorage.removeItem('fund_auth_token')
+  if (showMessage) ElMessage.success('已退出登录')
+}
+
+const restoreSession = async () => {
+  if (!authToken.value) return false
+  isLoading.value = true
+  loadingText.value = '正在恢复登录状态...'
+  try {
+    const data = await apiRequest('/auth/me')
+    currentUser.value = data.user
+    await loadDictionarySettings()
+    await loadData()
+    return true
+  } catch (err) {
+    console.warn('Restore session failed:', err)
+    return false
+  } finally {
+    isLoading.value = false
+  }
+}
 
 // 菜单选择处理
 const handleMenuSelect = (index) => {
+  if (index === 'dictionary' && !isAdmin.value) {
+    ElMessage.warning('访客账号不能维护系统字典')
+    return
+  }
   activeMenu.value = index
   if (isMobile.value) {
     isMobileMenuOpen.value = false
@@ -1853,7 +2003,6 @@ const syncFormFund = () => {
   form.fundSelections.forEach(item => {
     if (item && !dicts.funds.includes(item)) {
       dicts.funds.push(item)
-      saveDictionarySettings()
     }
   })
 }
@@ -1879,29 +2028,49 @@ const handleFundSelectionChange = (index) => {
   syncFormFund()
 }
 
-const saveDictionarySettings = () => {
+const saveDictionarySettings = async () => {
   try {
-    localStorage.setItem('fund_dictionary_settings', JSON.stringify({
+    const value = {
       funds: dicts.funds,
       aliases: toRaw(fundAliases)
-    }))
+    }
+    localStorage.setItem('fund_dictionary_settings', JSON.stringify(value))
+    if (currentUser.value && isAdmin.value) {
+      await apiRequest('/settings/fund_dictionary_settings', {
+        method: 'PUT',
+        body: JSON.stringify({ value })
+      })
+    }
   } catch (err) {
     console.error('Save dictionary failed:', err)
+    ElMessage.error(err.message || '字典保存失败')
   }
 }
 
-const loadDictionarySettings = () => {
+const applyDictionarySettings = (parsed) => {
+  if (!parsed || typeof parsed !== 'object') return
+  if (Array.isArray(parsed.funds)) {
+    const funds = parsed.funds.map(item => String(item).trim()).filter(item => item && item !== '待定')
+    dicts.funds.splice(0, dicts.funds.length, ...new Set(funds))
+  }
+  if (parsed.aliases && typeof parsed.aliases === 'object') {
+    Object.assign(fundAliases, parsed.aliases)
+  }
+}
+
+const loadDictionarySettings = async () => {
   try {
+    if (currentUser.value) {
+      const data = await apiRequest('/settings/fund_dictionary_settings')
+      if (data.value) {
+        applyDictionarySettings(data.value)
+        localStorage.setItem('fund_dictionary_settings', JSON.stringify(data.value))
+        return
+      }
+    }
     const saved = localStorage.getItem('fund_dictionary_settings')
     if (!saved) return
-    const parsed = JSON.parse(saved)
-    if (Array.isArray(parsed.funds)) {
-      const funds = parsed.funds.map(item => String(item).trim()).filter(item => item && item !== '待定')
-      dicts.funds.splice(0, dicts.funds.length, ...new Set(funds))
-    }
-    if (parsed.aliases && typeof parsed.aliases === 'object') {
-      Object.assign(fundAliases, parsed.aliases)
-    }
+    applyDictionarySettings(JSON.parse(saved))
   } catch (err) {
     console.error('Load dictionary failed:', err)
   }
@@ -1912,7 +2081,6 @@ const ensureFundOption = (fund) => {
   if (!normalized) return ''
   if (!dicts.funds.includes(normalized)) {
     dicts.funds.push(normalized)
-    saveDictionarySettings()
   }
   return normalized
 }
@@ -1924,6 +2092,7 @@ const ensureSourceOption = (source) => {
 }
 
 const addFundOption = () => {
+  if (!requireAdminAction()) return
   ElMessageBox.prompt('请输入新的基金名称', '添加所属基金', {
     confirmButtonText: '添加',
     cancelButtonText: '取消',
@@ -1934,16 +2103,17 @@ const addFundOption = () => {
       if (dicts.funds.includes(name)) return '该基金已存在'
       return true
     }
-  }).then(({ value }) => {
+  }).then(async ({ value }) => {
     const name = String(value).trim()
     dicts.funds.push(name)
     fundAliases[name] = name
-    saveDictionarySettings()
+    await saveDictionarySettings()
     ElMessage.success('基金已添加')
   }).catch(() => {})
 }
 
 const renameFundOption = (oldName) => {
+  if (!requireAdminAction()) return
   ElMessageBox.prompt('请输入新的基金名称，保存后会同步更新已有项目记录', '更改基金名称', {
     confirmButtonText: '保存',
     cancelButtonText: '取消',
@@ -1954,7 +2124,7 @@ const renameFundOption = (oldName) => {
       if (name !== oldName && dicts.funds.includes(name)) return '该基金已存在'
       return true
     }
-  }).then(({ value }) => {
+  }).then(async ({ value }) => {
     const newName = String(value).trim()
     if (newName === oldName) return
 
@@ -1979,13 +2149,14 @@ const renameFundOption = (oldName) => {
       syncFormFund()
     }
 
-    saveDictionarySettings()
-    saveToLocal()
+    await saveDictionarySettings()
+    await saveToLocal()
     ElMessage.success('基金名称已更新')
   }).catch(() => {})
 }
 
 const deleteFundOption = (fundName) => {
+  if (!requireAdminAction()) return
   const usedCount = projects.value.filter(project => project._fundNames?.includes(fundName)).length
   const message = usedCount
     ? `当前有 ${usedCount} 个项目使用“${fundName}”。删除后会同步从这些项目的所属基金中移除；如果项目没有其他所属基金，将清空所属基金。确定删除吗？`
@@ -1996,7 +2167,7 @@ const deleteFundOption = (fundName) => {
     cancelButtonText: '取消',
     type: usedCount ? 'warning' : 'info',
     confirmButtonClass: 'el-button--danger'
-  }).then(() => {
+  }).then(async () => {
     const index = dicts.funds.indexOf(fundName)
     if (index >= 0) dicts.funds.splice(index, 1)
 
@@ -2018,8 +2189,8 @@ const deleteFundOption = (fundName) => {
       syncFormFund()
     }
 
-    saveDictionarySettings()
-    saveToLocal()
+    await saveDictionarySettings()
+    await saveToLocal()
     ElMessage.success('基金已删除')
   }).catch(() => {})
 }
@@ -2043,6 +2214,7 @@ const normalizeProject = (p, duplicateMap) => {
   return {
     ...p,
     stage: normalizeProjectStage(p.stage),
+    industry965Category: normalizeIndustry965Category(p.industry965Category, p.industry965Direction),
     source,
     _fundNames: normFunds,
     _normalizedMonth: normMonth,
@@ -2100,6 +2272,15 @@ const loadData = async () => {
   isLoading.value = true;
   loadingText.value = '正在加载项目数据...';
   try {
+    if (currentUser.value) {
+      const data = await apiRequest('/projects')
+      const rawData = Array.isArray(data.projects) ? data.projects : []
+      projects.value = processProjects(rawData)
+      localStorage.setItem('fund_projects', JSON.stringify(rawData))
+      lastUpdateTime.value = new Date().toLocaleString()
+      return
+    }
+
     const saved = localStorage.getItem('fund_projects')
     let rawData = [];
     if (saved) {
@@ -2112,7 +2293,7 @@ const loadData = async () => {
     // 延迟一帧让 loading 显示
     await new Promise(r => setTimeout(r, 50));
     projects.value = processProjects(rawData);
-    if (!saved) saveToLocal();
+    if (!saved) await saveToLocal();
   } catch (err) {
     console.error('Load data failed:', err)
     projects.value = processProjects([...mockData])
@@ -2121,14 +2302,24 @@ const loadData = async () => {
   }
 }
 
-const saveToLocal = () => {
+const saveToLocal = async () => {
   try {
     // 使用 toRaw 确保保存的是原始数据而非 Proxy，避免循环引用问题
     const rawData = toRaw(projects.value).map(p => toRaw(p))
     localStorage.setItem('fund_projects', JSON.stringify(rawData))
+    if (currentUser.value && isAdmin.value) {
+      await apiRequest('/projects/bulk', {
+        method: 'PUT',
+        body: JSON.stringify({ projects: rawData })
+      })
+    }
     lastUpdateTime.value = new Date().toLocaleString()
   } catch (err) {
     console.error('Save to local failed:', err)
+    if (currentUser.value) {
+      ElMessage.error(err.message || '保存到服务器失败')
+      return
+    }
     // 如果仍然失败，尝试更激进的序列化
     try {
       const simpleData = projects.value.map(p => {
@@ -2207,6 +2398,7 @@ const getPriorityTagType = (p) => {
 }
 
 const openProjectDialog = (row = null) => {
+  if (!requireAdminAction()) return
   if (row) {
     Object.assign(form, defaultForm, row)
     form.fundSelections = parseFundNames(row.fund)
@@ -2225,7 +2417,8 @@ const handle965CategoryChange = (val) => {
 }
 
 const saveProject = () => {
-  formRef.value.validate((valid) => {
+  if (!requireAdminAction()) return
+  formRef.value.validate(async (valid) => {
     if (valid) {
       syncFormFund()
       // 基础校验
@@ -2269,20 +2462,22 @@ const saveProject = () => {
         projects.value = processProjects(newRaw)
         ElMessage.success('新增成功')
       }
-      saveToLocal()
+      await saveDictionarySettings()
+      await saveToLocal()
       dialogVisible.value = false
     }
   })
 }
 
 const handleDelete = (row) => {
+  if (!requireAdminAction()) return
   ElMessageBox.confirm(`确定删除项目 "${row.name}" 吗？`, '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
+  }).then(async () => {
     projects.value = processProjects(projects.value.filter(p => p.id !== row.id))
-    saveToLocal()
+    await saveToLocal()
     ElMessage.success('已删除')
   })
 }
@@ -2307,10 +2502,14 @@ const chartDataStage = computed(() => {
 })
 
 const chartData965Cat = computed(() => {
-  return dicts.industry965Categories.map(c => ({
-    name: c,
-    value: projects.value.filter(p => p.industry965Category === c).length
-  }))
+  const counts = {}
+  projects.value.forEach(project => {
+    const category = normalizeIndustry965Category(project.industry965Category, project.industry965Direction)
+    counts[category] = (counts[category] || 0) + 1
+  })
+  return dicts.industry965Categories
+    .map(category => ({ name: category, value: counts[category] || 0 }))
+    .filter(item => item.value > 0)
 })
 
 const chartData965Dir = computed(() => {
@@ -2789,6 +2988,7 @@ const downloadTemplate = () => {
 }
 
 const triggerImport = () => {
+  if (!requireAdminAction()) return
   fileInput.value.click()
 }
 
@@ -2997,6 +3197,10 @@ const parseImportRowsInBatches = async ({ text, dataStart, delimiter, headerToKe
 }
 
 const handleFileUpload = async (event) => {
+  if (!requireAdminAction()) {
+    event.target.value = ''
+    return
+  }
   const file = event.target.files[0]
   if (!file) return
   
@@ -3060,7 +3264,7 @@ const handleFileUpload = async (event) => {
         projects.value = await processProjectsInBatches([...toRaw(projects.value), ...rawNewItems])
         await waitForUi()
         loadingText.value = '正在保存数据...'
-        saveToLocal()
+        await saveToLocal()
         ElMessage.success(`导入完成：本次导入 ${rawNewItems.length} 条，当前项目总数 ${projects.value.length} 条。`)
       } else {
         ElMessage.warning('未能识别到有效项目数据。')
@@ -3083,29 +3287,30 @@ const handleFileUpload = async (event) => {
 
 // 系统维护功能
 const resetToMock = () => {
+  if (!requireAdminAction()) return
   ElMessageBox.confirm('重置将清空当前所有修改并恢复初始示例数据，确定吗？', '提示', { type: 'warning' })
-    .then(() => {
+    .then(async () => {
       projects.value = processProjects([...mockData])
-      saveToLocal()
+      await saveToLocal()
       ElMessage.success('已恢复示例数据')
     })
 }
 
 const clearAllData = () => {
+  if (!requireAdminAction()) return
   ElMessageBox.confirm('此操作将永久清空所有项目数据且无法撤销，确定吗？', '严重警告', { type: 'error' })
-    .then(() => {
+    .then(async () => {
       projects.value = []
-      saveToLocal()
+      await saveToLocal()
       ElMessage.success('数据已清空')
     })
 }
 
 // 生命周期
-onMounted(() => {
-  loadDictionarySettings()
-  loadData()
+onMounted(async () => {
+  await restoreSession()
   checkMobile()
-  if (activeMenu.value === 'overview') {
+  if (currentUser.value && activeMenu.value === 'overview') {
     nextTick(() => initCharts())
   } else if (activeMenu.value === 'invested') {
     nextTick(() => initInvestedCharts())
@@ -3162,6 +3367,95 @@ html, body, #app {
   overflow-x: hidden;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(30, 58, 138, 0.08) 0%, rgba(15, 118, 110, 0.08) 100%),
+    #f6f8fb;
+}
+
+.login-shell {
+  width: min(820px, 100%);
+  min-height: 460px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1fr);
+  background: #ffffff;
+  border: 1px solid #dbe4f0;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.login-brand-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px;
+  color: #ffffff;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 64, 175, 0.9)),
+    #1e3a8a;
+}
+
+.login-brand-kicker {
+  font-size: 24px;
+  letter-spacing: 0.04em;
+  color: #93c5fd;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.login-brand-title {
+  font-size: 32px;
+  line-height: 1.18;
+  font-weight: 800;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px;
+  background: #ffffff;
+}
+
+.login-form-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.login-title {
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.login-subtitle {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.login-form :deep(.el-input__wrapper) {
+  min-height: 46px;
+  border-radius: 4px;
+}
+
+.login-submit {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
 .dialog-body {
   max-height: 70vh;
   overflow-y: auto;
@@ -3169,6 +3463,41 @@ html, body, #app {
 }
 
 @media (max-width: 768px) {
+  .login-page {
+    align-items: stretch;
+    padding: 14px;
+  }
+
+  .login-shell {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand-panel {
+    padding: 28px 24px;
+  }
+
+  .login-brand-title {
+    font-size: 24px;
+    white-space: normal;
+  }
+
+  .login-brand-kicker {
+    font-size: 22px;
+  }
+
+  .login-card {
+    padding: 28px 24px;
+  }
+
+  .login-title {
+    font-size: 24px;
+  }
+
+  .login-form-header {
+    margin-bottom: 22px;
+  }
+
   .dialog-body {
     padding: 10px;
   }

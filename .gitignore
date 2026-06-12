@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
+backend/data/
+Project-FundingManagement-deploy.zip
 
 # Vite / frontend caches
 .vite/
